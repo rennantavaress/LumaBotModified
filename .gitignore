@@ -7,3 +7,4 @@ data/*
 bin/
 coverage/
 .claude
+graphify-out/.graphify_*
