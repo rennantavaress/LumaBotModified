@@ -73,7 +73,16 @@ export class SQLiteStorageAdapter extends StoragePort {
       .prepare('SELECT role, parts_json FROM conversation_history WHERE jid = ? ORDER BY id ASC')
       .all(jid);
 
-    return rows.map(r => ({ role: r.role, parts: JSON.parse(r.parts_json) }));
+    return rows.map(r => {
+      let parts = [];
+      try {
+        parts = JSON.parse(r.parts_json);
+        if (!Array.isArray(parts)) parts = [];
+      } catch {
+        parts = [];
+      }
+      return { role: r.role, parts };
+    });
   }
 
   async saveMessage(jid, role, parts) {

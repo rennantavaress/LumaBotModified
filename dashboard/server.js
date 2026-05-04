@@ -12,6 +12,70 @@ import Database      from 'better-sqlite3';
 
 dotenv.config();
 
+// ─── Sessões e Rate Limiting ─────────────────────────────────────────────────
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+const sessions = new Map(); // token -> { createdAt }
+
+function createSession() {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.set(token, { createdAt: Date.now() });
+  return token;
+}
+
+function isValidSession(token) {
+  if (!token) return false;
+  const session = sessions.get(token);
+  if (!session) return false;
+  if (Date.now() - session.createdAt > SESSION_TTL_MS) {
+    sessions.delete(token);
+    return false;
+  }
+  return true;
+}
+
+// Rate limiting simples em memória
+const loginAttempts = new Map();
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 min
+const LOGIN_MAX_ATTEMPTS = 10;
+
+const botControlAttempts = new Map();
+const BOT_CONTROL_WINDOW_MS = 60 * 1000; // 1 min
+const BOT_CONTROL_MAX = 10;
+
+function checkRateLimit(map, key, windowMs, max) {
+  const now = Date.now();
+  const record = map.get(key);
+  if (!record) {
+    map.set(key, { count: 1, windowStart: now });
+    return { ok: true };
+  }
+  if (now - record.windowStart > windowMs) {
+    record.count = 1;
+    record.windowStart = now;
+    return { ok: true };
+  }
+  record.count++;
+  if (record.count > max) {
+    return { ok: false, retryAfter: Math.ceil((record.windowStart + windowMs - now) / 1000) };
+  }
+  return { ok: true };
+}
+
+function cleanupRateLimitMaps() {
+  const now = Date.now();
+  for (const [key, record] of loginAttempts) {
+    if (now - record.windowStart > LOGIN_WINDOW_MS) loginAttempts.delete(key);
+  }
+  for (const [key, record] of botControlAttempts) {
+    if (now - record.windowStart > BOT_CONTROL_WINDOW_MS) botControlAttempts.delete(key);
+  }
+  for (const [token, session] of sessions) {
+    if (now - session.createdAt > SESSION_TTL_MS) sessions.delete(token);
+  }
+}
+setInterval(cleanupRateLimitMaps, 60000);
+
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR   = path.join(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'src', 'public');
@@ -256,7 +320,14 @@ function verifyGitHubSignature(req) {
     .createHmac('sha256', DEPLOY_SECRET)
     .update(req.rawBody)
     .digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length) return false;
+  try {
+    return crypto.timingSafeEqual(expBuf, sigBuf);
+  } catch {
+    return false;
+  }
 }
 
 function runDeploy() {
@@ -289,14 +360,24 @@ function scheduleDeploy() {
 const app    = express();
 const server = createServer(app);
 
+// Headers de segurança (helmet-like)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:;");
+  next();
+});
+
 app.use(express.json({
   verify: (req, _res, buf) => { req.rawBody = buf; },
+  limit: '10kb',
 }));
 
 function getToken(req) {
   const fromCookie = req.headers.cookie?.match(/(?:^|;\s*)dash_token=([^;]+)/)?.[1];
-  return req.query.token
-    || req.headers['x-dashboard-token']
+  return req.headers['x-dashboard-token']
     || (fromCookie ? decodeURIComponent(fromCookie) : '')
     || '';
 }
@@ -307,25 +388,32 @@ const PUBLIC_STATIC = new Set(['/styles.css', '/favicon.ico']);
 function authMiddleware(req, res, next) {
   if (!PASSWORD) return next();
   if (PUBLIC_STATIC.has(req.path)) return next();
-  if (getToken(req) === PASSWORD) return next();
+  const token = getToken(req);
+  if (isValidSession(token)) return next();
   if (req.headers.accept?.includes('text/html')) return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
   return res.status(401).json({ error: 'Unauthorized' });
 }
 
 // Rotas públicas
 app.post('/api/login', (req, res) => {
+  const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+  const limit = checkRateLimit(loginAttempts, clientIp, LOGIN_WINDOW_MS, LOGIN_MAX_ATTEMPTS);
+  if (!limit.ok) {
+    return res.status(429).json({ error: 'Muitas tentativas. Tente novamente mais tarde.' });
+  }
+
   const { password } = req.body ?? {};
   if (!PASSWORD || password === PASSWORD) {
-    // Detecta se a requisição chegou via HTTPS (ex: Cloudflare tunnel)
     const isSecure = req.headers['x-forwarded-proto'] === 'https' || req.secure;
-    res.cookie('dash_token', PASSWORD, {
-      httpOnly: false,            // precisa ser false para o dashboard.js ler via document.cookie se necessário
-      sameSite: isSecure ? 'none' : 'lax',
-      secure:   isSecure,        // SameSite=None exige Secure
+    const token = createSession();
+    res.cookie('dash_token', token, {
+      httpOnly: true,
+      sameSite: isSecure ? 'none' : 'strict',
+      secure:   isSecure,
       path:     '/',
-      maxAge:   7 * 24 * 60 * 60 * 1000, // 7 dias
+      maxAge:   SESSION_TTL_MS,
     });
-    res.json({ ok: true, token: PASSWORD });
+    res.json({ ok: true, token });
   } else {
     res.status(401).json({ error: 'Senha incorreta' });
   }
@@ -384,20 +472,30 @@ app.get('/api/stats', (_req, res) => {
   }
 });
 
-app.post('/api/bot/start',   (_req, res) => res.json(startBot()));
-app.post('/api/bot/stop',    (_req, res) => res.json(stopBot()));
-app.post('/api/bot/restart', (_req, res) => res.json(restartBot()));
+function botControlMiddleware(req, res, next) {
+  const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+  const limit = checkRateLimit(botControlAttempts, clientIp, BOT_CONTROL_WINDOW_MS, BOT_CONTROL_MAX);
+  if (!limit.ok) {
+    return res.status(429).json({ error: 'Muitas requisições. Aguarde.' });
+  }
+  next();
+}
+
+app.post('/api/bot/start',   botControlMiddleware, (_req, res) => res.json(startBot()));
+app.post('/api/bot/stop',    botControlMiddleware, (_req, res) => res.json(stopBot()));
+app.post('/api/bot/restart', botControlMiddleware, (_req, res) => res.json(restartBot()));
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, req) => {
-  // Autenticação via query string (?token=xxx)
-  const url   = new URL(req.url, `http://localhost`);
-  const token = url.searchParams.get('token') ?? '';
+  // Autenticação via cookie seguro (nunca via query string)
+  const cookieHeader = req.headers.cookie || '';
+  const match = cookieHeader.match(/(?:^|;\s*)dash_token=([^;]+)/);
+  const token = match ? decodeURIComponent(match[1]) : '';
 
-  if (PASSWORD && token !== PASSWORD) {
+  if (PASSWORD && !isValidSession(token)) {
     ws.close(4001, 'Unauthorized');
     return;
   }

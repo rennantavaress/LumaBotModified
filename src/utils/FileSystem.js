@@ -1,14 +1,26 @@
 import fs from "fs";
 import path from "path";
 
+const BASE_TEMP_DIR = path.resolve("./temp");
+
+function assertSafePath(target, baseDir = BASE_TEMP_DIR) {
+  const resolved = path.resolve(target);
+  const resolvedBase = path.resolve(baseDir);
+  if (!resolved.startsWith(resolvedBase)) {
+    throw new Error(`Path traversal detectado: ${target}`);
+  }
+}
+
 export class FileSystem {
   static ensureDir(dirPath) {
+    assertSafePath(dirPath);
     if (!fs.existsSync(dirPath)) {
       fs.mkdirSync(dirPath, { recursive: true });
     }
   }
 
   static removeDir(dirPath) {
+    assertSafePath(dirPath);
     if (fs.existsSync(dirPath)) {
       const files = fs.readdirSync(dirPath);
       for (const file of files) {
@@ -26,6 +38,8 @@ export class FileSystem {
   static cleanupFiles(files) {
     files.forEach((file) => {
       try {
+        if (!file) return;
+        assertSafePath(file);
         if (fs.existsSync(file)) fs.unlinkSync(file);
       } catch (e) {
         // Ignora erros de limpeza
@@ -35,6 +49,8 @@ export class FileSystem {
 
   static cleanupDir(dirPath) {
     try {
+      if (!dirPath) return;
+      assertSafePath(dirPath);
       if (fs.existsSync(dirPath)) {
         fs.readdirSync(dirPath).forEach((file) => {
           try {
