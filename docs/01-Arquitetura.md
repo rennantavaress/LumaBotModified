@@ -102,7 +102,7 @@ adapters/
 | `Container.js` | DI container — registra factories, resolve como lazy singleton |
 | `Bootstrap.js` | Instancia adapters, registra no Container, inicia ConnectionManager |
 | `BaileysSocketFactory.js` | Cria o socket Baileys com configuração correta |
-| `MessageRouter.js` | Recebe `messages.upsert`, cria BaileysAdapter, chama MessageHandler |
+| `MessageRouter.js` | Recebe `messages.upsert`, aplica rate limit por JID e sanitização de input, cria BaileysAdapter, chama MessageHandler |
 | `QrCodePresenter.js` | Exibe QR no terminal e emite sinal `[LUMA_QR]:...` para o dashboard |
 | `ReconnectionPolicy.js` | **Decide** o que fazer após desconexão (sem executar — só retorna a ação) |
 

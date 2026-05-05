@@ -1,5 +1,51 @@
 # Changelog — LumaBot
 
+## [6.5.0] — 2026-05-05
+
+### Hardening de Segurança (dashboard, IA, mídia, roteador)
+
+**Dashboard (`dashboard/server.js`, `src/public/`)**
+
+- Sessões substituem o token estático: `POST /api/login` agora devolve um token aleatório de 64 hex chars (via `crypto.randomBytes(32)`) com TTL de 7 dias; a senha não é mais exposta em cookies nem em `localStorage`
+- Cookie `dash_token` reconfigurado como `httpOnly: true` + `sameSite: strict` — inacessível ao JavaScript da página
+- `getToken` remove a leitura de query string (`?token=`), eliminando vazamento de credencial em logs de proxy
+- WebSocket autenticado via cookie (nunca via query string)
+- Rate limiting: 10 tentativas de login por IP/15 min; 10 requisições de controle do bot por IP/min
+- Headers de segurança adicionados globalmente: `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`, `Content-Security-Policy`
+- Corpo de requisição JSON limitado a 10 KB
+- `verifyGitHubSignature` corrigida: guarda de comprimento antes de `timingSafeEqual` evita exceção quando assinaturas têm tamanhos diferentes
+- Frontend remove armazenamento de token em `localStorage`; usa `credentials: 'include'` nas chamadas `fetch`
+
+**Injeção de comandos via shell (`VideoConverter`, `VideoDownloader`, `MediaProcessor`)**
+
+- Todas as chamadas `exec(cmd_string)` substituídas por `execFile(bin, args[])` — shell não é mais invocado, eliminando a superfície de injeção de comandos via nomes de arquivo maliciosos
+- Nomes de arquivos temporários trocados de `Date.now()` (previsível) para `crypto.randomUUID()` (não-adivinhável)
+
+**SSRF em URLs de usuário (`MediaProcessor`)**
+
+- `assertSafeUrl` bloqueia protocolos não-HTTP/S e IPs privados/loopback (RFC 1918, 169.254/16, multicast) antes de qualquer requisição de rede
+- `safeFetch` impõe timeout de 30 s e limite de bytes via streaming, evitando respostas infinitas
+
+**Prototype pollution (`OpenAIAdapter`)**
+
+- `#normalizeSchema` filtra explicitamente as chaves `__proto__`, `constructor` e `prototype` ao copiar objetos de schema
+
+**JSON corrompido (`SQLiteStorageAdapter`, `Database`)**
+
+- `JSON.parse` encapsulado em try/catch com fallback seguro (`[]` ou `null`) nos dois pontos que liam dados do banco sem tratamento
+
+**Rate limiting por JID (`MessageRouter`)**
+
+- Máximo de 10 mensagens por JID por segundo; mensagens excedentes são descartadas com log
+- Truncagem de `body` (4096 chars) e `senderName` (100 chars) antes de repassar ao `MessageHandler`
+
+**Path traversal (`FileSystem`)**
+
+- `assertSafePath` introduzida para validar que operações de arquivo ficam dentro do projeto
+- Corrigido: base de comparação trocada de `./temp` para raiz do projeto (`path.resolve(".")`), permitindo diretórios legítimos como `auth_info` sem abrir brechas reais de traversal
+
+---
+
 ## [6.4.1] — 2026-04-28
 
 ### Contexto de mensagens citadas: texto, imagem e figurinha
