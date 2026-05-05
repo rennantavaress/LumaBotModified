@@ -1,8 +1,10 @@
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
+import { URL } from "url";
 import { CONFIG, MESSAGES } from "../config/constants.js";
 import { Logger } from "../utils/Logger.js";
 import { getMessageType } from "../utils/MessageUtils.js";
@@ -10,7 +12,75 @@ import { ImageProcessor } from "../processors/ImageProcessor.js";
 import { VideoConverter } from "../processors/VideoConverter.js";
 import { FileSystem } from "../utils/FileSystem.js";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+// ─── Proteção SSRF ───────────────────────────────────────────────────────────
+
+function isPrivateIp(hostname) {
+  // Bloqueia localhost
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return true;
+  // Bloqueia IPs literais privados e loopback
+  const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipRegex.test(hostname)) {
+    const parts = hostname.split('.').map(Number);
+    if (parts[0] === 10) return true;
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    if (parts[0] === 127) return true;
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    if (parts[0] >= 224 && parts[0] <= 255) return true; // multicast/reserved
+  }
+  return false;
+}
+
+function assertSafeUrl(urlString) {
+  let parsed;
+  try {
+    parsed = new URL(urlString);
+  } catch {
+    throw new Error("URL inválida");
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error("Protocolo não suportado");
+  }
+  if (isPrivateIp(parsed.hostname)) {
+    throw new Error("Endereço interno bloqueado");
+  }
+}
+
+async function safeFetch(url, maxBytes = CONFIG.MAX_FILE_SIZE * 1024 * 5) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && parseInt(contentLength) > maxBytes) {
+      throw new Error("Arquivo muito grande");
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("Corpo da resposta indisponível");
+
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > maxBytes) throw new Error("Arquivo excede tamanho máximo");
+      chunks.push(value);
+    }
+
+    return Buffer.concat(chunks);
+  } catch (error) {
+    clearTimeout(timeout);
+    throw error;
+  }
+}
 
 /** Envia texto simples via socket sem depender do MessageHandler. */
 async function sendText(sock, jid, text) {
@@ -96,7 +166,7 @@ export class MediaProcessor {
   }
 
   static async processAnimatedSticker(buffer, sock, jid) {
-    const tempDir = path.join(CONFIG.TEMP_DIR, `frames_${Date.now()}`);
+    const tempDir = path.join(CONFIG.TEMP_DIR, `frames_${crypto.randomUUID()}`);
     FileSystem.ensureDir(tempDir);
 
     try {
@@ -153,31 +223,36 @@ export class MediaProcessor {
   }
 
   static async tryAlternativeMethod(buffer, sock, jid) {
+    const inputWebp = path.join(CONFIG.TEMP_DIR, `sticker_${crypto.randomUUID()}.webp`);
+    const gifOutput = path.join(CONFIG.TEMP_DIR, `gif_${crypto.randomUUID()}.gif`);
+    let mp4Output = null;
+
     try {
       Logger.info("🔄 Tentando método alternativo...");
-      const inputWebp = path.join(CONFIG.TEMP_DIR, `sticker_${Date.now()}.webp`);
       fs.writeFileSync(inputWebp, buffer);
 
-      const gifOutput = path.join(CONFIG.TEMP_DIR, `gif_${Date.now()}.gif`);
-      const altCmd = `ffmpeg -y -i "${inputWebp}" -vf "fps=${CONFIG.GIF_FPS},scale=512:512:flags=lanczos" -loop 0 "${gifOutput}"`;
-      await execAsync(altCmd);
+      await execFileAsync("ffmpeg", [
+        "-y", "-i", inputWebp,
+        "-vf", `fps=${CONFIG.GIF_FPS},scale=512:512:flags=lanczos`,
+        "-loop", "0",
+        gifOutput,
+      ]);
 
       if (!fs.existsSync(gifOutput) || fs.statSync(gifOutput).size === 0) {
         throw new Error("Método alternativo falhou");
       }
 
-      const mp4Output = await VideoConverter.toMp4(gifOutput);
+      mp4Output = await VideoConverter.toMp4(gifOutput);
       if (fs.existsSync(mp4Output)) {
         const mp4Buffer = fs.readFileSync(mp4Output);
         await sock.sendMessage(jid, { video: mp4Buffer, caption: MESSAGES.CONVERTED_GIF, gifPlayback: true });
         Logger.info("✅ Método alternativo funcionou!");
-        FileSystem.cleanupFiles([mp4Output]);
       }
-
-      FileSystem.cleanupFiles([inputWebp, gifOutput]);
     } catch (error) {
       Logger.error("Todos os métodos falharam", error);
       await sendText(sock, jid, MESSAGES.UNSUPPORTED_FORMAT);
+    } finally {
+      FileSystem.cleanupFiles([inputWebp, gifOutput, mp4Output].filter(Boolean));
     }
   }
 
@@ -213,30 +288,32 @@ export class MediaProcessor {
     const jid = message.key.remoteJid;
 
     try {
+      assertSafeUrl(url);
       Logger.info(`🔗 Baixando mídia da URL: ${url}`);
       await sendText(sock, jid, "🔄 Baixando mídia da URL...");
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Falha ao baixar: ${response.statusText}`);
-
-      const contentType = response.headers.get("content-type");
-      const contentLength = response.headers.get("content-length");
-
-      if (contentLength && parseInt(contentLength) > CONFIG.MAX_FILE_SIZE * 1024 * 5) {
-        await sendText(sock, jid, "❌ Arquivo muito grande para processar.");
-        return;
-      }
-
-      const buffer = Buffer.from(await response.arrayBuffer());
+      const buffer = await safeFetch(url);
       if (!buffer || buffer.length === 0) throw new Error("Buffer vazio");
 
-      let stickerBuffer;
-      if (contentType && (contentType.startsWith("video/") || contentType.includes("gif"))) {
-        stickerBuffer = await VideoConverter.toSticker(buffer, contentType.includes("gif"));
-      } else if (contentType && contentType.startsWith("image/")) {
-        stickerBuffer = await ImageProcessor.toSticker(buffer);
+      // Detecta tipo via magic bytes e fallback para extensão da URL
+      let isVideo = false;
+      let isGif = false;
+      if (buffer.slice(0, 4).toString('hex') === '47494638') { // GIF magic
+        isGif = true;
+      } else if (buffer.slice(0, 12).toString('hex').startsWith('00000018') || buffer.slice(4, 12).toString() === 'ftypisom' || buffer.slice(4, 12).toString() === 'ftypmp42') {
+        // MP4/WebM rough detection
+        isVideo = true;
       } else {
-        Logger.warn(`⚠️ Content-Type desconhecido: ${contentType}, tentando como imagem.`);
+        // Fallback por extensão da URL
+        const ext = path.extname(new URL(url).pathname).toLowerCase();
+        if (['.mp4', '.webm', '.mov'].includes(ext)) isVideo = true;
+        if (ext === '.gif') isGif = true;
+      }
+
+      let stickerBuffer;
+      if (isVideo || isGif) {
+        stickerBuffer = await VideoConverter.toSticker(buffer, isGif);
+      } else {
         stickerBuffer = await ImageProcessor.toSticker(buffer);
       }
 
@@ -248,7 +325,7 @@ export class MediaProcessor {
       }
     } catch (error) {
       Logger.error("Erro ao processar URL:", error);
-      await sendText(sock, jid, "❌ Erro ao baixar ou converter o link.");
+      await sendText(sock, jid, `❌ ${error.message || "Erro ao baixar ou converter o link."}`);
     }
   }
 }

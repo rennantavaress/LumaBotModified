@@ -1,12 +1,13 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { CONFIG, STICKER_METADATA } from "../config/constants.js";
 import { FileSystem } from "../utils/FileSystem.js";
 import { Exif } from "../utils/Exif.js";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class VideoConverter {
   static async toSticker(buffer, isGif = false) {
@@ -16,10 +17,20 @@ export class VideoConverter {
     fs.writeFileSync(input, buffer);
 
     const duration = isGif ? CONFIG.GIF_DURATION : CONFIG.VIDEO_DURATION;
-    const cmd = `ffmpeg -i "${input}" -t ${duration} -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=${CONFIG.VIDEO_FPS}" -c:v libwebp -quality ${CONFIG.WEBP_QUALITY} -loop 0 -an -fs ${CONFIG.MAX_FILE_SIZE}K "${output}"`;
+    const args = [
+      "-i", input,
+      "-t", String(duration),
+      "-vf", `scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=${CONFIG.VIDEO_FPS}`,
+      "-c:v", "libwebp",
+      "-quality", String(CONFIG.WEBP_QUALITY),
+      "-loop", "0",
+      "-an",
+      "-fs", `${CONFIG.MAX_FILE_SIZE}K`,
+      output,
+    ];
 
     try {
-      await execAsync(cmd);
+      await execFileAsync("ffmpeg", args);
 
       let finalBuffer = null;
 
@@ -43,17 +54,33 @@ export class VideoConverter {
 
   static async toGif(framesPattern) {
     const output = this.createTempPath("gif");
-    const cmd = `ffmpeg -y -framerate ${CONFIG.GIF_FPS} -i "${framesPattern}" -vf "split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer" -loop 0 "${output}"`;
+    const args = [
+      "-y",
+      "-framerate", String(CONFIG.GIF_FPS),
+      "-i", framesPattern,
+      "-vf", "split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer",
+      "-loop", "0",
+      output,
+    ];
 
-    await execAsync(cmd);
+    await execFileAsync("ffmpeg", args);
     return output;
   }
 
   static async toMp4(input) {
     const output = this.createTempPath("mp4", "video");
-    const cmd = `ffmpeg -y -i "${input}" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset fast -crf 23 "${output}"`;
+    const args = [
+      "-y", "-i", input,
+      "-movflags", "faststart",
+      "-pix_fmt", "yuv420p",
+      "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+      "-c:v", "libx264",
+      "-preset", "fast",
+      "-crf", "23",
+      output,
+    ];
 
-    await execAsync(cmd);
+    await execFileAsync("ffmpeg", args);
     return output;
   }
 
@@ -70,16 +97,16 @@ export class VideoConverter {
   static async remuxForMobile(input) {
     const output = this.createTempPath("mp4", "video");
 
-    const cmds = [
-      `ffmpeg -y -i "${input}" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -c:a copy -movflags faststart "${output}"`,
-      `ffmpeg -y -i "${input}" -c:v libopenh264 -pix_fmt yuv420p -c:a copy -movflags faststart "${output}"`,
-      `ffmpeg -y -i "${input}" -c:v copy -c:a copy -movflags faststart "${output}"`,
+    const argSets = [
+      ["-y", "-i", input, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "faststart", output],
+      ["-y", "-i", input, "-c:v", "libopenh264", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "faststart", output],
+      ["-y", "-i", input, "-c:v", "copy", "-c:a", "copy", "-movflags", "faststart", output],
     ];
 
     let lastError;
-    for (const cmd of cmds) {
+    for (const args of argSets) {
       try {
-        await execAsync(cmd);
+        await execFileAsync("ffmpeg", args);
         return output;
       } catch (err) {
         lastError = err;
@@ -90,6 +117,6 @@ export class VideoConverter {
   }
 
   static createTempPath(extension, prefix = "temp") {
-    return path.join(CONFIG.TEMP_DIR, `${prefix}_${Date.now()}.${extension}`);
+    return path.join(CONFIG.TEMP_DIR, `${prefix}_${crypto.randomUUID()}.${extension}`);
   }
 }

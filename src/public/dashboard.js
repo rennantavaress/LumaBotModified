@@ -1,14 +1,9 @@
 // ─── Autenticação ─────────────────────────────────────────────────────────────
 
-const TOKEN = localStorage.getItem('dash_token') ?? '';
-
-function authHeader() {
-  return TOKEN ? { 'x-dashboard-token': TOKEN } : {};
-}
-
-function tokenParam() {
-  return TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : '';
-}
+// Token é mantido em memória (nunca em localStorage) e propagado via cookie httpOnly.
+// O servidor gera um token de sessão aleatório após o login.
+// Cookie httpOnly é enviado automaticamente pelo browser.
+// credentials: 'include' garante que cookies sejam enviados mesmo em CORS (tunnel).
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
@@ -17,7 +12,8 @@ const api = {
     try {
       const res  = await fetch(path, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
       });
       if (res.status === 401) {
         if (window.barba) barba.go('/login');
@@ -74,7 +70,7 @@ class Dashboard {
 
   _connectWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url   = `${proto}//${location.host}/ws${tokenParam()}`;
+    const url   = `${proto}//${location.host}/ws`;
 
     this._ws = new WebSocket(url);
 
@@ -340,7 +336,7 @@ class Dashboard {
 
   async _fetchStats() {
     try {
-      const res  = await fetch('/api/status', { headers: authHeader() });
+      const res  = await fetch('/api/status', { credentials: 'include' });
       if (!res.ok) return;
       const data = await res.json();
       this.updateServerInfo(data);
@@ -351,7 +347,7 @@ class Dashboard {
     } catch (_) {}
 
     try {
-      const res  = await fetch('/api/stats', { headers: authHeader() });
+      const res  = await fetch('/api/stats', { credentials: 'include' });
       if (!res.ok) return;
       const s = await res.json();
       const set = (id, key) => {

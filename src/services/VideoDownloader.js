@@ -1,11 +1,12 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { CONFIG } from "../config/constants.js";
 import { Logger } from "../utils/Logger.js";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // Caminho do binário standalone do yt-dlp dentro do projeto
 const isWindows = process.platform === "win32";
@@ -59,18 +60,40 @@ export class VideoDownloader {
     const binDir = path.dirname(YTDLP_BIN);
     if (!fs.existsSync(binDir)) fs.mkdirSync(binDir, { recursive: true });
 
-    const response = await fetch(YTDLP_URL, { redirect: "follow" });
-    if (!response.ok) {
-      throw new Error(
-        `Falha ao baixar yt-dlp: ${response.status} ${response.statusText}`
-      );
+    const tmpPath = `${YTDLP_BIN}.tmp`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(YTDLP_URL, { redirect: "follow", signal: controller.signal });
+      clearTimeout(timeout);
+      if (!response.ok) {
+        throw new Error(
+          `Falha ao baixar yt-dlp: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const contentLength = response.headers.get("content-length");
+      if (contentLength && parseInt(contentLength) > 50 * 1024 * 1024) {
+        throw new Error("Binário yt-dlp muito grande (>50MB). Possível redirecionamento malicioso.");
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.length < 1024) {
+        throw new Error("Binário yt-dlp baixado parece estar corrompido (muito pequeno).");
+      }
+
+      fs.writeFileSync(tmpPath, buffer);
+      fs.renameSync(tmpPath, YTDLP_BIN);
+      if (!isWindows) fs.chmodSync(YTDLP_BIN, 0o755);
+
+      Logger.info(`✅ yt-dlp baixado com sucesso → ${YTDLP_BIN}`);
+    } catch (error) {
+      if (fs.existsSync(tmpPath)) {
+        try { fs.unlinkSync(tmpPath); } catch (_) {}
+      }
+      throw error;
     }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    fs.writeFileSync(YTDLP_BIN, buffer);
-    if (!isWindows) fs.chmodSync(YTDLP_BIN, 0o755);
-
-    Logger.info(`✅ yt-dlp baixado com sucesso → ${YTDLP_BIN}`);
   }
 
   /**
@@ -79,37 +102,48 @@ export class VideoDownloader {
    * @param {string} url - URL do vídeo (Twitter/X ou Instagram)
    * @returns {Promise<string>} Caminho absoluto do arquivo baixado
    */
+  static #assertValidUrl(url) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('Protocolo não suportado');
+      }
+    } catch {
+      throw new Error('URL inválida');
+    }
+  }
+
   static async download(url) {
+    this.#assertValidUrl(url);
     const ytdlp = await this.getBinaryPath();
-    const timestamp = Date.now();
+    const id = crypto.randomUUID();
     const outputTemplate = path.join(
       CONFIG.TEMP_DIR,
-      `ytdlp_${timestamp}.%(ext)s`
+      `ytdlp_${id}.%(ext)s`
     );
 
-    const cmd = [
-      `"${ytdlp}"`,
-      `-o "${outputTemplate}"`,
-      `--format "${CONFIG.VIDEO_DOWNLOAD_FORMAT}"`,
-      "--merge-output-format mp4",
-      `--max-filesize ${CONFIG.VIDEO_DOWNLOAD_MAX_SIZE_MB}M`,
+    const args = [
+      "-o", outputTemplate,
+      "--format", CONFIG.VIDEO_DOWNLOAD_FORMAT,
+      "--merge-output-format", "mp4",
+      "--max-filesize", `${CONFIG.VIDEO_DOWNLOAD_MAX_SIZE_MB}M`,
       "--no-playlist",
       "--no-warnings",
-      `"${url}"`,
-    ].join(" ");
+      url,
+    ];
 
     Logger.info(`📥 VideoDownloader: Iniciando download de ${url}`);
 
     try {
-      await execAsync(cmd, { timeout: CONFIG.VIDEO_DOWNLOAD_TIMEOUT_MS });
+      await execFileAsync(ytdlp, args, { timeout: CONFIG.VIDEO_DOWNLOAD_TIMEOUT_MS });
     } catch (error) {
       Logger.warn(`⚠️ VideoDownloader: yt-dlp saiu com erro: ${error.message}`);
     }
 
-    // Localiza o arquivo gerado com o timestamp único
+    // Localiza o arquivo gerado com o id único
     const tempFiles = fs
       .readdirSync(CONFIG.TEMP_DIR)
-      .filter((f) => f.startsWith(`ytdlp_${timestamp}.`))
+      .filter((f) => f.startsWith(`ytdlp_${id}.`))
       .map((f) => path.join(CONFIG.TEMP_DIR, f));
 
     if (tempFiles.length === 0) {
@@ -135,39 +169,39 @@ export class VideoDownloader {
    * @returns {Promise<{ filePath: string, title: string|null }>}
    */
   static async downloadAudio(url) {
+    this.#assertValidUrl(url);
     const ytdlp = await this.getBinaryPath();
-    const timestamp = Date.now();
+    const id = crypto.randomUUID();
     const outputTemplate = path.join(
       CONFIG.TEMP_DIR,
-      `ytdlp_audio_${timestamp}.%(ext)s`
+      `ytdlp_audio_${id}.%(ext)s`
     );
 
-    const downloadCmd = [
-      `"${ytdlp}"`,
-      `-x`,
-      `--audio-format mp3`,
-      `--audio-quality 0`,
-      `--embed-thumbnail`,
-      `--embed-metadata`,
-      `--convert-thumbnails jpg`,
-      `-o "${outputTemplate}"`,
-      `--no-playlist`,
-      `--no-warnings`,
-      `"${url}"`,
-    ].join(" ");
+    const args = [
+      "-x",
+      "--audio-format", "mp3",
+      "--audio-quality", "0",
+      "--embed-thumbnail",
+      "--embed-metadata",
+      "--convert-thumbnails", "jpg",
+      "-o", outputTemplate,
+      "--no-playlist",
+      "--no-warnings",
+      url,
+    ];
 
     Logger.info(`📥 VideoDownloader (áudio): Iniciando download de ${url}`);
 
     const [title] = await Promise.all([
       this._fetchTitle(url, ytdlp),
-      execAsync(downloadCmd, { timeout: CONFIG.VIDEO_DOWNLOAD_TIMEOUT_MS }).catch((err) => {
+      execFileAsync(ytdlp, args, { timeout: CONFIG.VIDEO_DOWNLOAD_TIMEOUT_MS }).catch((err) => {
         Logger.warn(`⚠️ VideoDownloader (áudio): yt-dlp saiu com erro: ${err.message}`);
       }),
     ]);
 
     const tempFiles = fs
       .readdirSync(CONFIG.TEMP_DIR)
-      .filter((f) => f.startsWith(`ytdlp_audio_${timestamp}.`))
+      .filter((f) => f.startsWith(`ytdlp_audio_${id}.`))
       .map((f) => path.join(CONFIG.TEMP_DIR, f));
 
     if (tempFiles.length === 0) {
@@ -190,8 +224,9 @@ export class VideoDownloader {
    */
   static async _fetchTitle(url, ytdlp) {
     try {
-      const { stdout } = await execAsync(
-        `"${ytdlp}" --skip-download --print "%(title)s" --no-warnings "${url}"`,
+      const { stdout } = await execFileAsync(
+        ytdlp,
+        ["--skip-download", "--print", "%(title)s", "--no-warnings", url],
         { timeout: 15000 }
       );
       return stdout.trim() || null;

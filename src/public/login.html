@@ -129,9 +129,7 @@
         }
 
         if (data.ok) {
-          const token = data.token ?? '';
-          localStorage.setItem('dash_token', token);
-          // Cookie já é setado pelo servidor via Set-Cookie na resposta do /api/login.
+          // Cookie httpOnly é setado pelo servidor via Set-Cookie.
           // Navegação completa (não SPA) para garantir que o browser processe o cookie
           // antes de requisitar a rota protegida.
           location.href = '/';

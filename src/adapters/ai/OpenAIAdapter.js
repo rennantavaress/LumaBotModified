@@ -78,10 +78,16 @@ export class OpenAIAdapter extends AIPort {
 
     const choice        = response.choices[0];
     const text          = choice.message?.content ?? "";
-    const functionCalls = (choice.message?.tool_calls ?? []).map((tc) => ({
-      name: tc.function.name,
-      args: JSON.parse(tc.function.arguments),
-    }));
+    const functionCalls = (choice.message?.tool_calls ?? []).map((tc) => {
+      let args = {};
+      try {
+        args = JSON.parse(tc.function.arguments);
+        if (typeof args !== 'object' || args === null) args = {};
+      } catch {
+        args = {};
+      }
+      return { name: tc.function.name, args };
+    });
 
     return { text, functionCalls };
   }
@@ -155,14 +161,21 @@ export class OpenAIAdapter extends AIPort {
    */
   #normalizeSchema(schema) {
     if (!schema || typeof schema !== "object") return schema;
-    const result = { ...schema };
+    const result = Object.create(null);
+    for (const key of Object.keys(schema)) {
+      if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+      result[key] = schema[key];
+    }
     if (typeof result.type === "string") {
       result.type = result.type.toLowerCase();
     }
     if (result.properties && typeof result.properties === "object") {
-      result.properties = Object.fromEntries(
-        Object.entries(result.properties).map(([k, v]) => [k, this.#normalizeSchema(v)])
-      );
+      const safeProps = Object.create(null);
+      for (const [k, v] of Object.entries(result.properties)) {
+        if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
+        safeProps[k] = this.#normalizeSchema(v);
+      }
+      result.properties = safeProps;
     }
     if (result.items) {
       result.items = this.#normalizeSchema(result.items);

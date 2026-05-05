@@ -85,9 +85,14 @@ export class DatabaseService {
 
   static getHistory(limit = 5) {
     const stmt = dbMetrics.prepare("SELECT timestamp, data FROM stats_history ORDER BY id DESC LIMIT ?");
-    return stmt.all(limit).map(row => ({
-      date: row.timestamp,
-      stats: JSON.parse(row.data)
-    }));
+    return stmt.all(limit).map(row => {
+      let stats = null;
+      try {
+        stats = JSON.parse(row.data);
+      } catch (e) {
+        // Dado corrompido no banco — ignora silenciosamente
+      }
+      return { date: row.timestamp, stats };
+    });
   }
 }
