@@ -1,12 +1,12 @@
 import fs from "fs";
 import path from "path";
 
-const BASE_TEMP_DIR = path.resolve("./temp");
+const BASE_PROJECT_DIR = path.resolve(".");
 
-function assertSafePath(target, baseDir = BASE_TEMP_DIR) {
+function assertSafePath(target, baseDir = BASE_PROJECT_DIR) {
   const resolved = path.resolve(target);
   const resolvedBase = path.resolve(baseDir);
-  if (!resolved.startsWith(resolvedBase)) {
+  if (!resolved.startsWith(resolvedBase + path.sep) && resolved !== resolvedBase) {
     throw new Error(`Path traversal detectado: ${target}`);
   }
 }
