@@ -129,9 +129,9 @@
         }
 
         if (data.ok) {
-          // Cookie httpOnly é setado pelo servidor via Set-Cookie.
-          // Navegação completa (não SPA) para garantir que o browser processe o cookie
-          // antes de requisitar a rota protegida.
+          // Token salvo em sessionStorage como fallback para WebSocket
+          // (alguns proxies/tunnels não repassam cookies no upgrade WS).
+          if (data.token) sessionStorage.setItem('dash_token', data.token);
           location.href = '/';
         } else {
           setError('» CREDENCIAL INVÁLIDA');

@@ -383,7 +383,7 @@ function getToken(req) {
 }
 
 // Assets estáticos públicos — necessários para a página de login renderizar com estilo
-const PUBLIC_STATIC = new Set(['/styles.css', '/favicon.ico']);
+const PUBLIC_STATIC = new Set(['/styles.css', '/favicon.ico', '/barba-init.js']);
 
 function authMiddleware(req, res, next) {
   if (!PASSWORD) return next();
@@ -490,10 +490,16 @@ app.post('/api/bot/restart', botControlMiddleware, (_req, res) => res.json(resta
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, req) => {
-  // Autenticação via cookie seguro (nunca via query string)
+  // Autenticação: cookie httpOnly tem prioridade; query param ?token= como fallback
+  // para ambientes onde proxies/tunnels não repassam Cookie no upgrade WebSocket.
   const cookieHeader = req.headers.cookie || '';
-  const match = cookieHeader.match(/(?:^|;\s*)dash_token=([^;]+)/);
-  const token = match ? decodeURIComponent(match[1]) : '';
+  const cookieMatch = cookieHeader.match(/(?:^|;\s*)dash_token=([^;]+)/);
+  const cookieToken = cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
+
+  const reqUrl     = new URL(req.url, 'http://localhost');
+  const queryToken = reqUrl.searchParams.get('token') || '';
+
+  const token = cookieToken || queryToken;
 
   if (PASSWORD && !isValidSession(token)) {
     ws.close(4001, 'Unauthorized');

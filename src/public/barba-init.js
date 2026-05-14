@@ -37,8 +37,7 @@ window.bindLoginForm = function bindLoginForm() {
     }
 
     if (data.ok) {
-      // Token de sessão é armazenado apenas em cookie httpOnly pelo servidor.
-      // O frontend não precisa (e não deve) guardá-lo em localStorage.
+      if (data.token) sessionStorage.setItem('dash_token', data.token);
       location.href = '/';
     } else {
       errEl.textContent = '» SENHA INCORRETA';

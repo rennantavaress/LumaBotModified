@@ -70,7 +70,9 @@ class Dashboard {
 
   _connectWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url   = `${proto}//${location.host}/ws`;
+    const token = sessionStorage.getItem('dash_token') ?? '';
+    const qs    = token ? `?token=${encodeURIComponent(token)}` : '';
+    const url   = `${proto}//${location.host}/ws${qs}`;
 
     this._ws = new WebSocket(url);
 
