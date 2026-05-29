@@ -33,6 +33,7 @@ export const COMMANDS = {
   STICKER_SHORT: "!s",
   IMAGE: "!image",
   IMAGE_SHORT: "!i",
+  PDF: "!pdf",
   GIF: "!gif",
   GIF_SHORT: "!g",
   HELP: "!help",
@@ -57,7 +58,8 @@ export const MENUS = {
     "🎨 *MÍDIA*\n" +
     "• *!sticker* (!s) - Imagem/Vídeo/Link -> Sticker\n" +
     "• *!gif* (!g) - Sticker Animado -> GIF\n" +
-    "• *!image* (!i) - Sticker -> Imagem\n\n" +
+    "• *!image* (!i) - Sticker -> Imagem\n" +
+    "• *!pdf* - Imagem -> PDF\n\n" +
     "🧠 *INTELIGÊNCIA ARTIFICIAL*\n" +
     "• *Luma* - Fale qualquer coisa (ex: 'Luma, bom dia')\n" +
     "• *!persona* - Abre o menu para mudar a Luma\n" +
@@ -86,6 +88,7 @@ export const MENUS = {
 };
 
 export const MESSAGES = {
+  REPLY_IMAGE_PDF: "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf",
   INITIALIZING: "🤖 WhatsApp Sticker Bot - Conversor Completo",
   STICKER_COMMAND: "🔄 !sticker - Converte imagem/vídeo para sticker",
   IMAGE_COMMAND: "🖼️ !image - Converte sticker para imagem",

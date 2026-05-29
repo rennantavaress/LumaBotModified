@@ -146,6 +146,38 @@ export class MediaProcessor {
     }
   }
 
+  static async processImageToPdf(message, sock, targetJid = null) {
+    try {
+      const jid = targetJid || message.key.remoteJid;
+      const type = getMessageType(message);
+
+      if (type !== "image") {
+        await sendText(sock, jid, MESSAGES.REPLY_IMAGE_PDF);
+        return false;
+      }
+
+      const buffer = await this.downloadMedia(message, sock);
+
+      if (!buffer) {
+        await sendText(sock, jid, MESSAGES.DOWNLOAD_ERROR);
+        return false;
+      }
+
+      const pdfBuffer = await ImageProcessor.toPdf(buffer);
+      await sock.sendMessage(jid, {
+        document: pdfBuffer,
+        mimetype: "application/pdf",
+        fileName: "imagem.pdf",
+      });
+      Logger.info("✅ PDF enviado");
+      return true;
+    } catch (error) {
+      Logger.error("Erro ao converter imagem para PDF:", error);
+      await sendText(sock, targetJid || message.key.remoteJid, MESSAGES.CONVERSION_ERROR);
+      return false;
+    }
+  }
+
   static async processStickerToGif(message, sock, targetJid = null) {
     try {
       Logger.info("🎬 Convertendo sticker para GIF...");

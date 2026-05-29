@@ -13,6 +13,7 @@ export class MediaPlugin {
     COMMANDS.STICKER_SHORT,
     COMMANDS.IMAGE,
     COMMANDS.IMAGE_SHORT,
+    COMMANDS.PDF,
     COMMANDS.GIF,
     COMMANDS.GIF_SHORT,
   ];
@@ -25,6 +26,8 @@ export class MediaPlugin {
       case COMMANDS.IMAGE:
       case COMMANDS.IMAGE_SHORT:
         return this.#handleImage(bot);
+      case COMMANDS.PDF:
+        return this.#handlePdf(bot);
       case COMMANDS.GIF:
       case COMMANDS.GIF_SHORT:
         return this.#handleGif(bot);
@@ -73,6 +76,25 @@ export class MediaPlugin {
     } else {
       await bot.react("❌");
       await bot.reply(MESSAGES.REPLY_STICKER_IMAGE);
+    }
+  }
+
+  async #handlePdf(bot) {
+    await bot.react("⏳");
+    if (bot.hasMedia) {
+      const ok = await MediaProcessor.processImageToPdf(bot.raw, bot.socket);
+      if (ok) MediaPlugin.#incrementMedia("pdfs_created");
+      await bot.react(ok ? "✅" : "❌");
+      return;
+    }
+    const quoted = bot.getQuotedAdapter();
+    if (quoted?.hasMedia) {
+      const ok = await MediaProcessor.processImageToPdf(quoted.raw, bot.socket, bot.jid);
+      if (ok) MediaPlugin.#incrementMedia("pdfs_created");
+      await bot.react(ok ? "✅" : "❌");
+    } else {
+      await bot.react("❌");
+      await bot.reply(MESSAGES.REPLY_IMAGE_PDF);
     }
   }
 

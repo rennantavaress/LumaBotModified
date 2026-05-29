@@ -16,6 +16,24 @@ const rateLimiter = new Map();
 const RATE_LIMIT_WINDOW_MS = 1000;
 const RATE_LIMIT_MAX_MSGS = 10;
 
+function cleanJid(jid) {
+  return jid?.split(':')[0].split('@')[0].replace(/\D/g, '') || null;
+}
+
+function isOwnPrivateChat(sock, botAdapter) {
+  if (botAdapter.isGroup) return false;
+
+  const chatId = cleanJid(botAdapter.jid);
+  const ownIds = [
+    sock.user?.id,
+    sock.user?.lid,
+    sock.authState?.creds?.me?.id,
+    sock.authState?.creds?.me?.lid,
+  ].map(cleanJid).filter(Boolean);
+
+  return !!chatId && ownIds.includes(chatId);
+}
+
 function isRateLimited(jid) {
   const now = Date.now();
   const record = rateLimiter.get(jid);
@@ -66,6 +84,10 @@ export async function routeMessages(sock, m) {
     for (const message of m.messages) {
       if (!message.message) continue;
       const botAdapter = new BaileysAdapter(sock, message);
+
+      if (botAdapter.isFromMe || isOwnPrivateChat(sock, botAdapter)) {
+        continue;
+      }
 
       if (isRateLimited(botAdapter.jid)) {
         Logger.warn(`⛔ Rate limit atingido para ${botAdapter.jid}`);
