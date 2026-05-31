@@ -1,6 +1,6 @@
 # Arquitetura do Sistema
 
-O LumaBot v6.0 implementa **Arquitetura Hexagonal (Ports & Adapters)** com **Plugin System** e **Injeção de Dependências**. Esta página descreve os fluxos reais de dados, os design patterns adotados e o raciocínio por trás de cada camada.
+O LumaBot v7.0 implementa **Arquitetura Hexagonal (Ports & Adapters)** com **Plugin System** e **Injeção de Dependências**. Esta página descreve os fluxos reais de dados, os design patterns adotados e o raciocínio por trás de cada camada.
 
 ---
 
@@ -69,6 +69,8 @@ export const AIPort = {
 | `PromptBuilder` | Monta o array `contents` no formato Gemini-style |
 | `AIProviderFactory` | Cria o provider certo baseado em `env.AI_PROVIDER` |
 | `GroupService` | Operações de grupo (isAdmin, mentionAll) |
+| `UserResolver` | Resolve JID → melhor nome humano; apelidos manuais |
+| `ReminderService` | Valida e persiste lembretes; normaliza linhas do banco |
 
 ### Adapters — Implementações Concretas
 
@@ -102,7 +104,9 @@ adapters/
 | `Container.js` | DI container — registra factories, resolve como lazy singleton |
 | `Bootstrap.js` | Instancia adapters, registra no Container, inicia ConnectionManager |
 | `BaileysSocketFactory.js` | Cria o socket Baileys com configuração correta |
-| `MessageRouter.js` | Recebe `messages.upsert`, aplica rate limit por JID e sanitização de input, cria BaileysAdapter, chama MessageHandler |
+| `MessageRouter.js` | Recebe `messages.upsert`, aplica rate limit por JID e sanitização, cria BaileysAdapter, enriquece perfis via `UserResolver`, chama MessageHandler |
+| `JidQueue.js` | Fila por JID — serializa o mesmo chat, paraleliza chats distintos |
+| `ReminderScheduler.js` | Loop de 30s que dispara lembretes vencidos (sobrevive a reinícios) |
 | `QrCodePresenter.js` | Exibe QR no terminal e emite sinal `[LUMA_QR]:...` para o dashboard |
 | `ReconnectionPolicy.js` | **Decide** o que fazer após desconexão (sem executar — só retorna a ação) |
 
@@ -129,14 +133,21 @@ export class MeuPlugin {
 
 **Plugins ativos:**
 
+Registrados em `MessageHandler.js`, nesta ordem:
+
 | Plugin | Comandos / Triggers |
 |--------|---------------------|
-| `LumaPlugin` | trigger "luma", áudio, `!persona`, `!luma clear`, `!luma stats` |
 | `MediaPlugin` | `!sticker`, `!image`, `!gif` |
 | `DownloadPlugin` | `!download` |
+| `AudioDownloadPlugin` | `!audio`, `!a` |
 | `GroupToolsPlugin` | `@everyone`, easter eggs |
+| `LumaPlugin` | trigger "luma", áudio, `!persona`, `!luma clear`, `!luma stats` |
 | `SpontaneousPlugin` | nenhum trigger — escuta `onMessage` |
 | `UtilsPlugin` | `!help`, `!meunumero` |
+| `ResumoPlugin` | `!resumo` |
+| `UserPlugin` | `!nick`, `!apelido` |
+| `RankPlugin` | `!rank`, `!rank global` |
+| `ReminderPlugin` | `!lembrete` (alias `!lembrar`) |
 
 ---
 
@@ -285,15 +296,23 @@ index.js
   └── ConnectionManager
         ├── BaileysSocketFactory      (cria o socket)
         ├── QrCodePresenter           (exibe QR)
-        ├── MessageRouter             (roteia eventos)
+        ├── contacts.upsert/update    → UserResolver (enriquece wa_users)
+        ├── ReminderScheduler         (dispara lembretes vencidos a cada 30s)
+        ├── MessageRouter             (roteia eventos; UserResolver enriquece perfis)
         │     └── MessageHandler
         │           └── PluginManager
-        │                 ├── LumaPlugin → LumaHandler → AIProviderFactory → AIService/OpenAIAdapter
-        │                 │                          └── ConversationHistory
+        │                 ├── LumaPlugin → LumaHandler → AIProviderFactory → GeminiAdapter/OpenAIAdapter
+        │                 │                          ├── ConversationHistory
+        │                 │                          └── ToolDispatcher → (tag_everyone, remove_member,
+        │                 │                                create_*, search_web, schedule_reminder...)
         │                 ├── MediaPlugin → MediaProcessor → ImageProcessor/VideoConverter
-        │                 ├── DownloadPlugin → VideoDownloader
+        │                 ├── DownloadPlugin / AudioDownloadPlugin → VideoDownloader
         │                 ├── SpontaneousPlugin → SpontaneousHandler
         │                 ├── GroupToolsPlugin → GroupManager
+        │                 ├── ResumoPlugin
+        │                 ├── UserPlugin → UserResolver (apelidos)
+        │                 ├── RankPlugin → DatabaseService (luma_interactions) + UserResolver
+        │                 ├── ReminderPlugin → ReminderService
         │                 └── UtilsPlugin
         └── ReconnectionPolicy        (decide ações, não executa)
 ```

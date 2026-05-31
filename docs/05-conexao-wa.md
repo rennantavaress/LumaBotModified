@@ -451,6 +451,35 @@ class MediaDownloader {
 }
 ```
 
+## 👤 Enriquecimento de Usuários (`contacts.*`)
+
+Além de `messages.upsert`, o `ConnectionManager` registra os eventos de contato
+do Baileys para enriquecer os perfis em `wa_users` (via `UserResolver`):
+
+```javascript
+// src/managers/ConnectionManager.js → setupEventHandlers()
+this.sock.ev.on('contacts.upsert', contacts => this.handleContacts(contacts));
+this.sock.ev.on('contacts.update', contacts => this.handleContacts(contacts));
+// handleContacts → UserResolver.upsertFromContact({ id, name, notify, lid, ... })
+```
+
+Em paralelo, o `MessageRouter` faz upsert do remetente (com `pushName`) e
+registro básico dos JIDs mencionados a cada mensagem — é o ponto único por onde
+toda mensagem passa. Nenhuma dessas operações bloqueia o processamento se falhar.
+
+Por que não resolver JID→nome em tempo real? Porque o WhatsApp não garante o
+nome a partir de um JID arbitrário (especialmente `@lid`). Acumular fontes ao
+longo do tempo e escolher o melhor nome na exibição é mais robusto. Ver
+[04-banco-dados.md](./04-banco-dados.md) e o `UserResolver`.
+
+## ⏰ Agendador de Lembretes
+
+O `ConnectionManager` instancia um `ReminderScheduler` e o inicia quando a
+conexão abre (`connection === 'open'`), repassando o socket atual a cada
+reconexão. O loop (30s) busca lembretes vencidos no SQLite e os dispara
+mencionando as pessoas no grupo (ou no PV). Como vivem no banco, **sobrevivem a
+reinícios** — o primeiro tick após subir recupera o que venceu offline.
+
 ## 🔔 Outros Eventos Importantes
 
 ### Atualização de Presença

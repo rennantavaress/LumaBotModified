@@ -657,4 +657,33 @@ Os prompts usam um prefixo de sistema que a Luma não revela ao usuário, manten
 
 ---
 
+## ⏰ Lembretes via Function Calling
+
+A Luma agenda lembretes por linguagem natural usando a tool `schedule_reminder`
+(declarada em `lumaConfig.TOOLS`). O segredo é o contexto temporal: como
+`{{CURRENT_DATETIME}}` (horário de Brasília) já é injetado em todo prompt, o
+modelo calcula a **data/hora absoluta em ISO 8601** (`-03:00`) a partir de
+expressões relativas ("próxima terça às 16h").
+
+```
+"Luma, me lembre do evento de videogame terça às 16h"
+        │
+        ├─ schedule_reminder({ reminder_text: "evento de videogame",
+        │                      datetime: "2026-06-02T16:00:00-03:00" })
+        │
+        └─ ToolDispatcher.handleScheduleReminder()
+               ├─ resolve alvos: menções da mensagem (ou o autor)
+               ├─ ReminderService.schedule() valida (futuro, ≤1 ano, texto)
+               └─ confirma na persona da Luma
+```
+
+Ao chegar a hora, o `ReminderScheduler` (em `src/infra/`) dispara o lembrete
+mencionando as pessoas no grupo ou avisando no PV. Detalhes de persistência em
+[04-banco-dados.md](./04-banco-dados.md).
+
+> O comando manual `!lembrete DD/MM/AAAA HH:mm | texto` não passa pela IA — o
+> `ReminderPlugin` parseia a data direto e chama o mesmo `ReminderService`.
+
+---
+
 **Próximo passo**: Aprenda sobre processamento de mídia em [03-motor-midia.md](./03-motor-midia.md)
