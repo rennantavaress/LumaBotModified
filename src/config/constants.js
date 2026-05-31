@@ -88,7 +88,7 @@ export const MENUS = {
 };
 
 export const MESSAGES = {
-  REPLY_IMAGE_PDF: "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf",
+  REPLY_IMAGE_PDF: "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf nome do arquivo",
   INITIALIZING: "🤖 WhatsApp Sticker Bot - Conversor Completo",
   STICKER_COMMAND: "🔄 !sticker - Converte imagem/vídeo para sticker",
   IMAGE_COMMAND: "🖼️ !image - Converte sticker para imagem",

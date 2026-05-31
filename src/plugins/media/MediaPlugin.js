@@ -3,6 +3,26 @@ import { MediaProcessor } from "../../handlers/MediaProcessor.js";
 import { DatabaseService } from "../../services/Database.js";
 import { extractUrl } from "../../utils/MessageUtils.js";
 
+const DEFAULT_PDF_FILENAME = "imagem.pdf";
+
+function getPdfFileName(body) {
+  const rawName = body
+    ?.replace(new RegExp(`^\\s*${COMMANDS.PDF}\\s*`, "i"), "")
+    .trim();
+
+  if (!rawName) return DEFAULT_PDF_FILENAME;
+
+  const slug = rawName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  return slug ? `${slug}.pdf` : DEFAULT_PDF_FILENAME;
+}
+
 /**
  * Plugin de mídia: converte imagens/vídeos em stickers, stickers em imagens/GIFs.
  * Comandos: !sticker (!s), !image (!i), !gif (!g)
@@ -81,15 +101,17 @@ export class MediaPlugin {
 
   async #handlePdf(bot) {
     await bot.react("⏳");
+    const fileName = getPdfFileName(bot.body);
+
     if (bot.hasMedia) {
-      const ok = await MediaProcessor.processImageToPdf(bot.raw, bot.socket);
+      const ok = await MediaProcessor.processImageToPdf(bot.raw, bot.socket, null, fileName);
       if (ok) MediaPlugin.#incrementMedia("pdfs_created");
       await bot.react(ok ? "✅" : "❌");
       return;
     }
     const quoted = bot.getQuotedAdapter();
     if (quoted?.hasMedia) {
-      const ok = await MediaProcessor.processImageToPdf(quoted.raw, bot.socket, bot.jid);
+      const ok = await MediaProcessor.processImageToPdf(quoted.raw, bot.socket, bot.jid, fileName);
       if (ok) MediaPlugin.#incrementMedia("pdfs_created");
       await bot.react(ok ? "✅" : "❌");
     } else {

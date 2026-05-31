@@ -91,6 +91,18 @@ async function sendText(sock, jid, text) {
   }
 }
 
+function ensurePdfFileName(fileName) {
+  const cleanName = String(fileName || "imagem.pdf")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 84);
+
+  if (!cleanName) return "imagem.pdf";
+  return cleanName.toLowerCase().endsWith(".pdf") ? cleanName : `${cleanName}.pdf`;
+}
+
 export class MediaProcessor {
   static async processToSticker(message, sock, targetJid = null) {
     if (message.message?.viewOnceMessage || message.message?.viewOnceMessageV2) {
@@ -146,7 +158,7 @@ export class MediaProcessor {
     }
   }
 
-  static async processImageToPdf(message, sock, targetJid = null) {
+  static async processImageToPdf(message, sock, targetJid = null, fileName = "imagem.pdf") {
     try {
       const jid = targetJid || message.key.remoteJid;
       const type = getMessageType(message);
@@ -167,7 +179,7 @@ export class MediaProcessor {
       await sock.sendMessage(jid, {
         document: pdfBuffer,
         mimetype: "application/pdf",
-        fileName: "imagem.pdf",
+        fileName: ensurePdfFileName(fileName),
       });
       Logger.info("✅ PDF enviado");
       return true;

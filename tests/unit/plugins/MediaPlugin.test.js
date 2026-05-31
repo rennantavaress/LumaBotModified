@@ -53,7 +53,7 @@ describe('MediaPlugin - !pdf com imagem', () => {
 
     await plugin.onCommand(COMMANDS.PDF, bot);
 
-    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(bot.raw, bot.socket);
+    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(bot.raw, bot.socket, null, 'imagem.pdf');
     expect(bot.react).toHaveBeenCalledWith('✅');
   });
 
@@ -64,8 +64,40 @@ describe('MediaPlugin - !pdf com imagem', () => {
 
     await plugin.onCommand(COMMANDS.PDF, bot);
 
-    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(quoted.raw, bot.socket, bot.jid);
+    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(quoted.raw, bot.socket, bot.jid, 'imagem.pdf');
     expect(bot.react).toHaveBeenCalledWith('✅');
+  });
+
+  it('usa nome personalizado quando informado apos !pdf', async () => {
+    const quoted = makeBot({ hasMedia: true, raw: { quoted: true } });
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({
+      body: '!pdf trabalho de fisica',
+      getQuotedAdapter: vi.fn().mockReturnValue(quoted),
+    });
+
+    await plugin.onCommand(COMMANDS.PDF, bot);
+
+    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(
+      quoted.raw,
+      bot.socket,
+      bot.jid,
+      'trabalho-de-fisica.pdf',
+    );
+  });
+
+  it('remove acentos e caracteres invalidos do nome personalizado', async () => {
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({ body: '!pdf Física: lista 01?', hasMedia: true });
+
+    await plugin.onCommand(COMMANDS.PDF, bot);
+
+    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(
+      bot.raw,
+      bot.socket,
+      null,
+      'fisica-lista-01.pdf',
+    );
   });
 
   it('responde quando nao ha imagem', async () => {
