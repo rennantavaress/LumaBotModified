@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "dashboard": "node dashboard/server.js",
+    "dashboard": "node dashboard/launch.js",
     "dashboard:dev": "nodemon dashboard/server.js",
     "dashboard:web:dev": "npm --prefix dashboard/web run dev",
     "dashboard:build": "npm --prefix dashboard/web install && npm --prefix dashboard/web run build",

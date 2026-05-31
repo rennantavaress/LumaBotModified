@@ -22,6 +22,9 @@ module.exports = {
       kill_timeout: 5000,
       env: {
         NODE_ENV: "production",
+        // Marca o processo como supervisionado: no auto-deploy o server sai com
+        // código 0 e o PM2 respawna com o código novo (back + painel).
+        LUMA_SUPERVISED: "1",
       },
     },
   ],

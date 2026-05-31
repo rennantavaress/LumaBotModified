@@ -224,6 +224,16 @@ function restartBot() {
   return { ok: true };
 }
 
+// Encerra os processos filhos (bot e tunnel) quando o dashboard sai — incluindo
+// o restart de deploy — para não deixar uma segunda sessão do bot órfã.
+function shutdownChildren() {
+  try { botProcess?.kill('SIGTERM'); } catch { /* já encerrado */ }
+  try { tunnelProcess?.kill('SIGTERM'); } catch { /* já encerrado */ }
+}
+process.on('exit', shutdownChildren);
+process.on('SIGTERM', () => { shutdownChildren(); process.exit(0); });
+process.on('SIGINT', () => { shutdownChildren(); process.exit(0); });
+
 async function handleQRSignal(qrRaw) {
   try {
     const dataUrl = await QRCode.toDataURL(qrRaw, {
@@ -341,7 +351,12 @@ function verifyGitHubSignature(req) {
 
 // Indica se o processo roda sob um supervisor (pm2/systemd) que o reinicia
 // automaticamente ao sair. Necessário para aplicar mudanças no próprio server.js.
-const IS_SUPERVISED = !!(process.env.pm_id ?? process.env.PM2_HOME ?? process.env.INVOCATION_ID);
+const IS_SUPERVISED = !!(
+  process.env.LUMA_SUPERVISED ??
+  process.env.pm_id ??
+  process.env.PM2_HOME ??
+  process.env.INVOCATION_ID
+);
 const WEB_DIR = path.join(__dirname, 'web');
 
 function runDeploy() {
