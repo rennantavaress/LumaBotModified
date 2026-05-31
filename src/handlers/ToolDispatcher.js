@@ -5,6 +5,7 @@ import { DatabaseService } from "../services/Database.js";
 import { PersonalityManager } from "../managers/PersonalityManager.js";
 import { MENUS } from "../config/constants.js";
 import { LUMA_CONFIG } from "../config/lumaConfig.js";
+import { ReminderService } from "../core/services/ReminderService.js";
 
 /**
  * Despachante de ferramentas acionadas pela IA.
@@ -41,6 +42,9 @@ export class ToolDispatcher {
                         break;
                     case "show_help":
                         await this.handleShowHelp(bot);
+                        break;
+                    case "schedule_reminder":
+                        await this.handleScheduleReminder(bot, call.args);
                         break;
                     case "show_personality_menu":
                         await this.handleShowPersonalityMenu(bot);
@@ -249,6 +253,43 @@ export class ToolDispatcher {
 
     static async handleShowHelp(bot) {
         await bot.sendText(MENUS.HELP_TEXT);
+    }
+
+    /**
+     * Agenda um lembrete a partir da linguagem natural. As pessoas a mencionar
+     * vêm das menções da mensagem; se ninguém foi marcado, lembra quem pediu.
+     */
+    static async handleScheduleReminder(bot, args) {
+        const text = args?.reminder_text || args?.text;
+        const datetime = args?.datetime;
+        if (!text || !datetime) {
+            await bot.reply("⚠️ Preciso saber o que lembrar e quando, anjo!");
+            return;
+        }
+
+        const mentioned = await bot.getMentionedJids();
+        const creator = bot.senderJid;
+        const mentionJids = mentioned.length > 0 ? mentioned : [creator];
+
+        try {
+            const { fireAt } = ReminderService.schedule({
+                chatJid: bot.jid,
+                isGroup: bot.isGroup,
+                creatorJid: creator,
+                mentionJids,
+                text,
+                datetime,
+            });
+            const when = new Date(fireAt).toLocaleString("pt-BR", {
+                timeZone: "America/Sao_Paulo",
+                dateStyle: "short",
+                timeStyle: "short",
+            });
+            await bot.reply(`⏰ Anotado! Te lembro disso em ${when}.`);
+        } catch (error) {
+            Logger.error("Erro ao agendar lembrete:", error);
+            await bot.reply(`⚠️ Não consegui agendar: ${error.message}`);
+        }
     }
 
     static async handleShowPersonalityMenu(bot) {

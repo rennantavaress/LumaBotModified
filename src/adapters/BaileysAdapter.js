@@ -252,6 +252,7 @@ export class BaileysAdapter extends MessagingPort {
 
   async sendText(text, options = {}) {
     const payload = { text };
+    if (options.mentions?.length) payload.mentions = options.mentions;
     if (options.quoted) {
       const quotedMsg =
         options.quoted instanceof BaileysAdapter
@@ -264,8 +265,8 @@ export class BaileysAdapter extends MessagingPort {
     return await this.sock.sendMessage(this.remoteJid, payload);
   }
 
-  async reply(text) {
-    return await this.sendText(text, { quoted: this.raw });
+  async reply(text, options = {}) {
+    return await this.sendText(text, { ...options, quoted: this.raw });
   }
 
   async sendPresence(type) {

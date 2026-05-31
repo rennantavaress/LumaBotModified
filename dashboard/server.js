@@ -10,6 +10,11 @@ import QRCode        from 'qrcode';
 import dotenv        from 'dotenv';
 import Database      from 'better-sqlite3';
 
+import { readConfig, writeConfig } from '../src/config/configService.js';
+import { DatabaseService }         from '../src/services/Database.js';
+import { ReminderService }         from '../src/core/services/ReminderService.js';
+import { UserResolver }            from '../src/core/services/UserResolver.js';
+
 dotenv.config();
 
 // ─── Sessões e Rate Limiting ─────────────────────────────────────────────────
@@ -79,6 +84,10 @@ setInterval(cleanupRateLimitMaps, 60000);
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR   = path.join(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'src', 'public');
+// App React buildado (Vite). Se existir, tem prioridade sobre o legado em src/public.
+const WEB_DIST   = path.join(__dirname, 'web', 'dist');
+const HAS_WEB_BUILD = fs.existsSync(path.join(WEB_DIST, 'index.html'));
+const SERVE_DIR  = HAS_WEB_BUILD ? WEB_DIST : PUBLIC_DIR;
 
 const PORT           = parseInt(process.env.DASHBOARD_PORT  || '3000', 10);
 const PASSWORD       = process.env.DASHBOARD_PASSWORD       || '';
@@ -330,21 +339,57 @@ function verifyGitHubSignature(req) {
   }
 }
 
+// Indica se o processo roda sob um supervisor (pm2/systemd) que o reinicia
+// automaticamente ao sair. Necessário para aplicar mudanças no próprio server.js.
+const IS_SUPERVISED = !!(process.env.pm_id ?? process.env.PM2_HOME ?? process.env.INVOCATION_ID);
+const WEB_DIR = path.join(__dirname, 'web');
+
 function runDeploy() {
   pushLog('🚀 Deploy iniciado (push na main)...', 'info');
   try {
     pushLog('📥 Executando git pull...', 'info');
-    execSync('git pull origin main', { cwd: ROOT_DIR, timeout: 30000 });
+    execSync('git pull origin main', { cwd: ROOT_DIR, timeout: 60000 });
 
-    const changed = execSync('git diff HEAD~1 HEAD --name-only', { cwd: ROOT_DIR }).toString();
-
-    if (changed.includes('package')) {
-      pushLog('📦 Instalando dependências...', 'info');
-      execSync('npm install --omit=dev --no-audit', { cwd: ROOT_DIR, timeout: 120000 });
+    // Arquivos alterados pelo pull (HEAD@{1} = estado anterior). Em caso de
+    // falha (reflog ausente), assume que tudo mudou para não pular nenhum build.
+    let changed = '';
+    try {
+      changed = execSync('git diff --name-only HEAD@{1} HEAD', { cwd: ROOT_DIR }).toString();
+    } catch {
+      changed = 'package.json dashboard/web/package.json';
     }
 
-    pushLog('✅ Deploy concluído. Reiniciando bot...', 'success');
-    restartBot();
+    if (/(^|\/)package(-lock)?\.json/m.test(changed)) {
+      pushLog('📦 Instalando dependências do bot...', 'info');
+      execSync('npm install --omit=dev --no-audit', { cwd: ROOT_DIR, timeout: 180000 });
+    }
+
+    // Dashboard React (Vite): instala devDeps (necessárias ao build) e regenera
+    // o dist. O dist não é versionado, então precisa ser buildado no servidor.
+    if (fs.existsSync(path.join(WEB_DIR, 'package.json'))) {
+      const webDepsChanged = /dashboard\/web\/package(-lock)?\.json/.test(changed);
+      const needsInstall = webDepsChanged || !fs.existsSync(path.join(WEB_DIR, 'node_modules'));
+      if (needsInstall) {
+        pushLog('📦 Instalando dependências do dashboard...', 'info');
+        execSync('npm ci --no-audit', { cwd: WEB_DIR, timeout: 300000 });
+      }
+      pushLog('🏗️ Buildando o dashboard...', 'info');
+      execSync('npm run build', { cwd: WEB_DIR, timeout: 300000 });
+    }
+
+    pushLog('✅ Deploy concluído.', 'success');
+
+    if (IS_SUPERVISED) {
+      // Reinicia o processo inteiro: carrega o novo server.js, serve o dist
+      // recém-buildado e o backend sobe com o código novo. O supervisor respawna.
+      pushLog('🔄 Reiniciando o dashboard para aplicar as mudanças...', 'warn');
+      setTimeout(() => process.exit(0), 1500);
+    } else {
+      // Sem supervisor não podemos reiniciar a nós mesmos com segurança.
+      // O backend é reiniciado; o painel exige restart manual do processo.
+      restartBot();
+      pushLog('⚠️ Backend reiniciado. Rode o dashboard sob pm2/systemd para que o painel também atualize sozinho (veja ecosystem.config.cjs).', 'warn');
+    }
   } catch (error) {
     pushLog(`❌ Deploy falhou: ${error.message}`, 'error');
   }
@@ -440,16 +485,28 @@ app.post('/api/deploy', (req, res) => {
   scheduleDeploy();
 });
 
-// Rotas protegidas
-app.use(authMiddleware);
-app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'dashboard.html')));
-app.use(express.static(PUBLIC_DIR));
+// ─── Servir a aplicação ────────────────────────────────────────────────────────
+// Com build React presente, os assets são públicos (a UI cuida do login via API).
+// Sem build, mantém o dashboard legado (vanilla) protegido pelo authMiddleware.
+if (HAS_WEB_BUILD) {
+  app.use(express.static(WEB_DIST));
+} else {
+  app.use(authMiddleware);
+  app.use(express.static(PUBLIC_DIR));
+}
 
-app.get('/api/status', (_req, res) => {
+/** Autenticação dos endpoints de dados — sempre JSON 401 quando não autorizado. */
+function apiAuth(req, res, next) {
+  if (!PASSWORD) return next();
+  if (isValidSession(getToken(req))) return next();
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
+app.get('/api/status', apiAuth, (_req, res) => {
   res.json({ status: botStatus, uptime: getUptime(), reconnects: reconnectCount, pid: botProcess?.pid ?? null, hasQR: !!currentQR, qr: currentQR, publicUrl });
 });
 
-app.get('/api/logs', (req, res) => {
+app.get('/api/logs', apiAuth, (req, res) => {
   const { level, search, limit = 200 } = req.query;
   let logs = [...logBuffer];
   if (level && level !== 'all') logs = logs.filter(l => l.level === level);
@@ -457,7 +514,7 @@ app.get('/api/logs', (req, res) => {
   res.json(logs.slice(-parseInt(limit)));
 });
 
-app.get('/api/stats', (_req, res) => {
+app.get('/api/stats', apiAuth, (_req, res) => {
   const dbPath = path.join(ROOT_DIR, 'data', 'luma_metrics.sqlite');
   try {
     if (!fs.existsSync(dbPath)) return res.json({});
@@ -472,6 +529,89 @@ app.get('/api/stats', (_req, res) => {
   }
 });
 
+// ─── Configuração ───────────────────────────────────────────────────────────────
+app.get('/api/config', apiAuth, (_req, res) => {
+  try {
+    res.json(readConfig());
+  } catch (err) {
+    pushLog(`Erro ao ler config: ${err.message}`, 'error');
+    res.status(500).json({ error: 'Falha ao ler configuração' });
+  }
+});
+
+app.put('/api/config', apiAuth, (req, res) => {
+  try {
+    writeConfig(req.body?.changes ?? []);
+    pushLog('⚙️ Configuração atualizada pelo dashboard', 'info');
+    res.json({ ok: true });
+  } catch (err) {
+    pushLog(`Erro ao salvar config: ${err.message}`, 'error');
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── Usuários & Ranking ───────────────────────────────────────────────────────
+app.get('/api/users', apiAuth, (_req, res) => {
+  try {
+    const users = DatabaseService.getAllWaUsers().map((u) => ({
+      jid: u.jid,
+      displayName: UserResolver.getDisplayName(u),
+      nickname: u.bot_nickname ?? '',
+      pushName: u.push_name ?? '',
+      lastSeen: u.last_seen_at,
+    }));
+    res.json(users);
+  } catch (_) {
+    res.json([]);
+  }
+});
+
+app.put('/api/users/:jid/nick', apiAuth, (req, res) => {
+  const { jid } = req.params;
+  const nickname = String(req.body?.nickname ?? '').trim().slice(0, 60);
+  try {
+    DatabaseService.setNickname(jid, nickname);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/ranking', apiAuth, (req, res) => {
+  const { scope = 'global', jid } = req.query;
+  try {
+    const rows = scope === 'group' && jid
+      ? DatabaseService.getGroupRanking(jid, 20)
+      : DatabaseService.getGlobalRanking(20);
+    res.json(rows.map((r) => ({
+      jid: r.sender_jid,
+      name: UserResolver.getDisplayName(r.sender_jid),
+      count: r.count,
+      lastAt: r.last_at,
+    })));
+  } catch (_) {
+    res.json([]);
+  }
+});
+
+// ─── Lembretes ────────────────────────────────────────────────────────────────
+app.get('/api/reminders', apiAuth, (_req, res) => {
+  try {
+    res.json(ReminderService.getPending());
+  } catch (_) {
+    res.json([]);
+  }
+});
+
+app.delete('/api/reminders/:id', apiAuth, (req, res) => {
+  try {
+    ReminderService.cancel(parseInt(req.params.id, 10));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 function botControlMiddleware(req, res, next) {
   const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
   const limit = checkRateLimit(botControlAttempts, clientIp, BOT_CONTROL_WINDOW_MS, BOT_CONTROL_MAX);
@@ -481,9 +621,16 @@ function botControlMiddleware(req, res, next) {
   next();
 }
 
-app.post('/api/bot/start',   botControlMiddleware, (_req, res) => res.json(startBot()));
-app.post('/api/bot/stop',    botControlMiddleware, (_req, res) => res.json(stopBot()));
-app.post('/api/bot/restart', botControlMiddleware, (_req, res) => res.json(restartBot()));
+app.post('/api/bot/start',   apiAuth, botControlMiddleware, (_req, res) => res.json(startBot()));
+app.post('/api/bot/stop',    apiAuth, botControlMiddleware, (_req, res) => res.json(stopBot()));
+app.post('/api/bot/restart', apiAuth, botControlMiddleware, (_req, res) => res.json(restartBot()));
+
+// SPA fallback: qualquer GET fora de /api serve o index.html do app React.
+if (HAS_WEB_BUILD) {
+  app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
+} else {
+  app.get('/', authMiddleware, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'dashboard.html')));
+}
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 
