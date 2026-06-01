@@ -134,15 +134,30 @@ com `LUMA_SUPERVISED=1`.
 
 ### PM2 (produção, sobrevive a reboot)
 
+O `ecosystem.config.cjs` define dois apps independentes:
+
+| App | Script | Função |
+|-----|--------|--------|
+| `luma` | `dashboard/server.js` | Backend, SPA e bot-filho |
+| `luma-tunnel` | `dashboard/tunnel.js` | Cloudflare Tunnel isolado |
+
 ```bash
 npm install -g pm2
 npm run dashboard:build
-pm2 start ecosystem.config.cjs   # script: dashboard/server.js, LUMA_SUPERVISED=1
+
+pm2 start ecosystem.config.cjs --only luma          # dashboard + bot
+pm2 start ecosystem.config.cjs --only luma-tunnel   # tunnel (só se CLOUDFLARE_TUNNEL=true)
 pm2 save && pm2 startup
 ```
 
-Autorestart + persistência no boot. No deploy, o `server.js` sai com código 0 e
-o PM2 respawna.
+O `luma-tunnel` roda em processo **separado** do `luma`. Quando o PM2 reinicia o
+dashboard (deploy ou crash), o tunnel **não é afetado** e a URL do
+`trycloudflare.com` permanece a mesma. A URL é gravada em `data/tunnel-url.txt`
+pelo `tunnel.js`; o dashboard lê esse arquivo ao subir e emite o evento
+`tunnel_url` pelo WebSocket.
+
+> Para não usar tunnel, simplesmente não suba o `luma-tunnel`. O `luma` funciona
+> normalmente sem ele.
 
 ---
 

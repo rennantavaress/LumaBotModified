@@ -27,5 +27,21 @@ module.exports = {
         LUMA_SUPERVISED: "1",
       },
     },
+    {
+      // Tunnel independente — sobrevive aos restarts do dashboard, mantendo a
+      // mesma URL enquanto o processo não for reiniciado manualmente.
+      // Ative com: pm2 start ecosystem.config.cjs --only luma-tunnel
+      // (só necessário se CLOUDFLARE_TUNNEL=true no .env)
+      name: "luma-tunnel",
+      script: "dashboard/tunnel.js",
+      cwd: __dirname,
+      autorestart: true,
+      max_restarts: 20,
+      restart_delay: 5000,
+      kill_timeout: 5000,
+      env: {
+        NODE_ENV: "production",
+      },
+    },
   ],
 };

@@ -1,5 +1,32 @@
 # Changelog — LumaBot
 
+## [7.1.0] — 2026-06-01
+
+### Tunnel independente do dashboard (`luma-tunnel`)
+
+**Problema:** o Cloudflare Tunnel era spawned como processo filho do `dashboard/server.js`. A cada restart do PM2 (deploy ou crash) o `shutdownChildren` matava o tunnel, que subia novamente gerando uma URL nova no `trycloudflare.com`.
+
+**Solução:** o tunnel passa a rodar como processo PM2 irmão (`luma-tunnel`), desacoplado do ciclo de vida do dashboard.
+
+- `dashboard/tunnel.js` (novo) — wrapper standalone: spawna o `cloudflared`, captura a URL e a persiste em `data/tunnel-url.txt`.
+- `dashboard/server.js` — quando `IS_SUPERVISED` (PM2/launcher), `startTunnel()` lê `data/tunnel-url.txt` e observa mudanças com `fs.watch` em vez de spawnar o `cloudflared`. `shutdownChildren()` não mata o tunnel nesse modo.
+- `ecosystem.config.cjs` — novo app `luma-tunnel` (autorestart, backoff de 5 s).
+
+**Migração:**
+```bash
+pm2 stop luma
+pm2 start ecosystem.config.cjs --only luma-tunnel
+pm2 start ecosystem.config.cjs --only luma
+pm2 save
+```
+
+### Correção: chave de API herdada do processo pai
+
+- `src/config/env.js`: `dotenv.config()` → `dotenv.config({ override: true })`.
+  Antes, se o dashboard atualizava `process.env.DEEPSEEK_API_KEY` via edição de config e depois reiniciava o bot, o bot herdava o valor em memória do dashboard, ignorando o `.env` em disco (dotenv é idempotente por padrão). Com `override: true`, o `.env` é sempre a fonte de verdade para o processo do bot.
+
+---
+
 ## [7.0.0] — 2026-05-31
 
 ### Resolução de usuários por JID (`UserResolver`, `wa_users`)

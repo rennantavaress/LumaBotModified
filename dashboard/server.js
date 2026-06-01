@@ -91,7 +91,8 @@ const SERVE_DIR  = HAS_WEB_BUILD ? WEB_DIST : PUBLIC_DIR;
 
 const PORT           = parseInt(process.env.DASHBOARD_PORT  || '3000', 10);
 const PASSWORD       = process.env.DASHBOARD_PASSWORD       || '';
-const TUNNEL_ENABLED = process.env.CLOUDFLARE_TUNNEL === 'true';
+const TUNNEL_ENABLED  = process.env.CLOUDFLARE_TUNNEL === 'true';
+const TUNNEL_URL_FILE = path.join(ROOT_DIR, 'data', 'tunnel-url.txt');
 const DEPLOY_SECRET  = process.env.DEPLOY_WEBHOOK_SECRET    || '';
 
 let deployDebounceTimer = null;
@@ -228,7 +229,11 @@ function restartBot() {
 // o restart de deploy — para não deixar uma segunda sessão do bot órfã.
 function shutdownChildren() {
   try { botProcess?.kill('SIGTERM'); } catch { /* já encerrado */ }
-  try { tunnelProcess?.kill('SIGTERM'); } catch { /* já encerrado */ }
+  // Quando supervisionado pelo PM2, o tunnel roda como processo irmão (luma-tunnel)
+  // e não deve ser encerrado junto com o dashboard.
+  if (!IS_SUPERVISED) {
+    try { tunnelProcess?.kill('SIGTERM'); } catch { /* já encerrado */ }
+  }
 }
 process.on('exit', shutdownChildren);
 process.on('SIGTERM', () => { shutdownChildren(); process.exit(0); });
@@ -274,8 +279,28 @@ let tunnelProcess  = null;
 let tunnelRestarts = 0;
 const MAX_TUNNEL_RESTARTS = 10;
 
+function readTunnelUrlFile() {
+  try {
+    const url = fs.readFileSync(TUNNEL_URL_FILE, 'utf-8').trim();
+    if (url && url !== publicUrl) {
+      publicUrl = url;
+      pushLog(`🌐 URL do tunnel: ${url}`, 'info');
+      broadcast({ type: 'tunnel_url', url });
+      console.log(`\n🌐 Acesso externo: ${url}\n`);
+    }
+  } catch { /* arquivo ainda não existe — tunnel ainda está subindo */ }
+}
+
 function startTunnel() {
   if (!TUNNEL_ENABLED || tunnelProcess) return;
+
+  // Quando supervisionado (PM2), o tunnel roda como processo irmão (luma-tunnel).
+  // O dashboard apenas lê a URL do arquivo gravado por aquele processo.
+  if (IS_SUPERVISED) {
+    readTunnelUrlFile();
+    try { fs.watch(TUNNEL_URL_FILE, () => readTunnelUrlFile()); } catch { /* arquivo ainda não existe */ }
+    return;
+  }
 
   pushLog(`🌐 Iniciando Cloudflare Tunnel... (tentativa ${tunnelRestarts + 1})`, 'info');
 
