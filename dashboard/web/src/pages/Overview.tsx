@@ -87,14 +87,16 @@ export function Overview({ status, qr, publicUrl }: Props) {
             </div>
 
             {publicUrl && (
-              <a
-                href={publicUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="truncate font-mono text-xs text-accent hover:underline"
-              >
-                🌐 {publicUrl}
-              </a>
+              <div className="min-w-0 w-full overflow-hidden">
+                <a
+                  href={publicUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block truncate font-mono text-xs text-accent hover:underline"
+                >
+                  🌐 {publicUrl}
+                </a>
+              </div>
             )}
           </CardContent>
         </Card>

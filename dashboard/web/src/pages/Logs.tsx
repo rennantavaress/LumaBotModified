@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LogEntry, LogLevel } from "@/lib/types";
 import { Input } from "@/components/ui";
@@ -22,27 +22,33 @@ const LEVEL_COLOR: Record<LogLevel, string> = {
 export function Logs({ logs }: { logs: LogEntry[] }) {
   const [filter, setFilter] = useState<LogLevel | "all">("all");
   const [query, setQuery] = useState("");
+  const [clearedAt, setClearedAt] = useState(0);
   const endRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     return logs.filter(
-      (l) => (filter === "all" || l.level === filter) && (!q || l.message.toLowerCase().includes(q))
+      (l) =>
+        l.timestamp > clearedAt &&
+        (filter === "all" || l.level === filter) &&
+        (!q || l.message.toLowerCase().includes(q))
     );
-  }, [logs, filter, query]);
+  }, [logs, filter, query, clearedAt]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [filtered.length]);
 
   return (
-    <div className="animate-fade-up space-y-5">
-      <div>
+    // h-full + flex-col faz o terminal preencher exatamente o espaço restante
+    // da área rolável do AppShell, sem transbordar para o body.
+    <div className="animate-fade-up flex h-full flex-col gap-4">
+      <div className="shrink-0">
         <h1 className="font-display text-2xl font-bold tracking-tight">Logs</h1>
         <p className="text-sm text-fg-soft">Saída do bot em tempo real.</p>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (
             <button
@@ -57,18 +63,29 @@ export function Logs({ logs }: { logs: LogEntry[] }) {
             </button>
           ))}
         </div>
-        <div className="relative sm:ml-auto sm:w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <Input
-            placeholder="Buscar…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9"
-          />
+
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="relative flex-1 sm:w-64 sm:flex-none">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+            <Input
+              placeholder="Buscar…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <button
+            onClick={() => setClearedAt(Date.now())}
+            title="Limpar logs"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-danger"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      <div className="h-[calc(100vh-280px)] min-h-[320px] overflow-y-auto rounded-lg border border-border bg-bg/60 p-4 font-mono text-xs leading-relaxed">
+      {/* Terminal: flex-1 + min-h-0 garante que o scroll fique aqui, não na página */}
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border bg-bg/60 p-4 font-mono text-xs leading-relaxed">
         {filtered.length === 0 ? (
           <div className="grid h-full place-items-center text-muted">Sem logs.</div>
         ) : (

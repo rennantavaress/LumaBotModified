@@ -56,7 +56,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col lg:flex-row">
+    <div className="mx-auto flex h-full max-w-[1400px] w-full flex-col overflow-hidden lg:flex-row">
       {/* Rail lateral — desktop */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border px-4 py-6 lg:flex">
         <Brand />
@@ -83,24 +83,34 @@ export function AppShell({
         </div>
       </aside>
 
-      {/* Topo mobile */}
-      <header className="flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
-        <Brand />
-        <StatusPill status={status} connected={connected} />
-      </header>
-
-      {/* Conteúdo */}
-      <main className="flex-1 px-4 pb-24 pt-5 lg:px-8 lg:pb-10 lg:pt-6">
-        {/* Header desktop */}
-        <div className="mb-6 hidden items-center justify-between lg:flex">
-          <div className="h-px flex-1" />
+      {/* Coluna direita: header + conteúdo */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Topo mobile */}
+        <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 lg:hidden">
+          <Brand />
           <StatusPill status={status} connected={connected} />
-        </div>
-        {children}
-      </main>
+        </header>
+
+        {/* Conteúdo principal */}
+        <main className="flex flex-1 flex-col overflow-hidden">
+          {/* Status pill — desktop */}
+          <div className="hidden shrink-0 items-center justify-between px-8 pb-4 pt-6 lg:flex">
+            <div className="h-px flex-1" />
+            <StatusPill status={status} connected={connected} />
+          </div>
+
+          {/* Área rolável — scroll fica aqui, nunca no body */}
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 pb-28 pt-5 lg:px-8 lg:pb-10 lg:pt-0">
+            {children}
+          </div>
+        </main>
+      </div>
 
       {/* Bottom nav — mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-border bg-surface/90 backdrop-blur-lg lg:hidden">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-30 flex shrink-0 items-stretch border-t border-border bg-surface/90 backdrop-blur-lg lg:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
         {NAV.map((item) => (
           <NavLink
             key={item.to}
