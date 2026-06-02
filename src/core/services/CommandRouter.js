@@ -35,6 +35,11 @@ export class CommandRouter {
     if (lower.startsWith(COMMANDS.DOWNLOAD))        return COMMANDS.DOWNLOAD;
     if (lower.startsWith(COMMANDS.DOWNLOAD_SHORT))  return COMMANDS.DOWNLOAD;
     if (lower.startsWith(COMMANDS.RESUMO))         return COMMANDS.RESUMO;
+    if (lower.startsWith(COMMANDS.NICK_ALT))       return COMMANDS.NICK_ALT;
+    if (lower.startsWith(COMMANDS.NICK))           return COMMANDS.NICK;
+    if (lower.startsWith(COMMANDS.RANK))           return COMMANDS.RANK;
+    if (lower.startsWith(COMMANDS.REMINDER_SHORT)) return COMMANDS.REMINDER;
+    if (lower.startsWith(COMMANDS.REMINDER))       return COMMANDS.REMINDER;
 
     return null;
   }

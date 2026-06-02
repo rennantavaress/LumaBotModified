@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
  * Módulo de configuração centralizada de variáveis de ambiente.
  *
  * Responsabilidades:
- * 1. Carrega o arquivo .env uma única vez (idempotente — dotenv ignora chamadas repetidas)
+ * 1. Carrega o arquivo .env com override:true — prevalece sobre env herdado do processo pai
  * 2. Valida as variáveis obrigatórias e lança erro explicativo se alguma faltar
  * 3. Exporta um objeto de config congelado — ninguém deve acessar process.env diretamente
  *
@@ -20,8 +20,9 @@ import dotenv from 'dotenv';
  */
 
 // Carrega o .env do diretório de trabalho atual (root do projeto).
-// No dashboard, process.cwd() é o mesmo root pois o script é lançado de lá.
-dotenv.config();
+// override:true garante que o .env do bot prevalece sobre env herdado do processo
+// pai (dashboard), evitando que uma chave antiga em memória contamine o bot.
+dotenv.config({ override: true });
 
 // ─── Aviso de configuração de IA ──────────────────────────────────────────────
 

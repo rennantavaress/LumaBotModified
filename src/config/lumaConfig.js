@@ -1,4 +1,6 @@
-export const LUMA_CONFIG = {
+import { ConfigStore } from "./ConfigStore.js";
+
+const LUMA_CONFIG_DEFAULTS = {
   DEFAULT_PERSONALITY: "pensadora",
 
   PERSONALITIES: {
@@ -225,6 +227,24 @@ export const LUMA_CONFIG = {
             required: ["query"],
           },
         },
+        {
+          name: "schedule_reminder",
+          description: "Agenda um lembrete para ser disparado numa data/hora futura. Quando chegar a hora, menciona as pessoas marcadas na mensagem (ou quem pediu, se ninguém foi marcado). Use quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro, ou avisar alguém depois (ex: 'me lembra da reunião terça às 16h', 'avisa o @fulano amanhã de manhã').",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              reminder_text: {
+                type: "STRING",
+                description: "O que deve ser lembrado, curto e direto. Ex: 'evento de videogame', 'reunião com o time'.",
+              },
+              datetime: {
+                type: "STRING",
+                description: "Data e hora ABSOLUTAS do disparo em ISO 8601 com fuso de Brasília (-03:00). Calcule a partir da 'Data e hora atual' informada no prompt. Ex: '2026-06-02T16:00:00-03:00'.",
+              },
+            },
+            required: ["reminder_text", "datetime"],
+          },
+        },
       ],
     },
   ],
@@ -251,6 +271,7 @@ Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar m
 - Se o usuário pedir explicitamente para pesquisar, buscar, googlar ou procurar algo na internet, use search_web OBRIGATORIAMENTE — sem exceções.
 - Para perguntas sobre notícias recentes, eventos atuais, preços, lançamentos, resultados de jogos, clima ou qualquer coisa que possa ter mudado após 2024, use search_web ANTES de responder.
 - Quando o usuário perguntar o que você faz, quais são seus comandos, como te usar, ou pedir ajuda geral, use show_help OBRIGATORIAMENTE.
+- Quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro ou avisar alguém depois, use schedule_reminder com a data/hora ABSOLUTA em ISO 8601 (fuso -03:00), calculada a partir da "Data e hora atual" informada acima.
 - Você NÃO precisa justificar que chamou a função. Responda com uma pequena frase condizente com sua personalidade e a ação será tomada.
 - IMPORTANTE: NÃO ESCREVA O NOME DA FUNÇÃO NO TEXTO. Execute a ação pelo sistema (chamada de ferramenta da API). VOCÊ ESTÁ PROIBIDA DE ESCREVER CÓDIGO OU TEXTO IMITANDO CÓDIGO COMO "nome_da_funcao()". APENAS ENVIE TEXTO NORMAL PARA O USUÁRIO E ACIONE A FERRAMENTA DE FATO.
 
@@ -310,6 +331,7 @@ Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar m
 - Se o usuário pedir explicitamente para pesquisar, buscar, googlar ou procurar algo na internet, use search_web OBRIGATORIAMENTE — sem exceções.
 - Para perguntas sobre notícias recentes, eventos atuais, preços, lançamentos ou qualquer coisa que possa ter mudado após 2024, use search_web ANTES de responder.
 - Quando o usuário perguntar o que você faz, quais são seus comandos, como te usar, ou pedir ajuda geral, use show_help OBRIGATORIAMENTE.
+- Quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro ou avisar alguém depois, use schedule_reminder com a data/hora ABSOLUTA em ISO 8601 (fuso -03:00), calculada a partir da "Data e hora atual" informada acima.
 - Você NÃO precisa justificar que chamou a função. Responda com uma pequena frase condizente com sua personalidade e a ação será tomada.
 - IMPORTANTE: NÃO ESCREVA O NOME DA FUNÇÃO NO TEXTO. Execute a ação pelo sistema (chamada de ferramenta da API). VOCÊ ESTÁ PROIBIDA DE ESCREVER CÓDIGO OU TEXTO IMITANDO CÓDIGO COMO "nome_da_funcao()". APENAS ENVIE TEXTO NORMAL PARA O USUÁRIO E ACIONE A FERRAMENTA DE FATO.
 
@@ -335,3 +357,16 @@ Imagem anexada. Legenda: "{{USER_MESSAGE}}"
 
 Sua análise (curta e sem prefixos):`,
 };
+
+// Aplica overrides do dashboard sobre os defaults antes de exportar.
+// TRIGGERS pode chegar do override como strings (JSON não guarda RegExp);
+// normalizamos de volta para RegExp para os consumidores que chamam .test().
+export const LUMA_CONFIG = (() => {
+  const cfg = ConfigStore.apply("LUMA_CONFIG", LUMA_CONFIG_DEFAULTS);
+  if (Array.isArray(cfg.TRIGGERS)) {
+    cfg.TRIGGERS = cfg.TRIGGERS.map((t) =>
+      t instanceof RegExp ? t : new RegExp(t, "i")
+    );
+  }
+  return cfg;
+})();

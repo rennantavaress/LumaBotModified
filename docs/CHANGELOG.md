@@ -1,5 +1,85 @@
 # Changelog — LumaBot
 
+## [7.1.0] — 2026-06-01
+
+### Tunnel independente do dashboard (`luma-tunnel`)
+
+**Problema:** o Cloudflare Tunnel era spawned como processo filho do `dashboard/server.js`. A cada restart do PM2 (deploy ou crash) o `shutdownChildren` matava o tunnel, que subia novamente gerando uma URL nova no `trycloudflare.com`.
+
+**Solução:** o tunnel passa a rodar como processo PM2 irmão (`luma-tunnel`), desacoplado do ciclo de vida do dashboard.
+
+- `dashboard/tunnel.js` (novo) — wrapper standalone: spawna o `cloudflared`, captura a URL e a persiste em `data/tunnel-url.txt`.
+- `dashboard/server.js` — quando `IS_SUPERVISED` (PM2/launcher), `startTunnel()` lê `data/tunnel-url.txt` e observa mudanças com `fs.watch` em vez de spawnar o `cloudflared`. `shutdownChildren()` não mata o tunnel nesse modo.
+- `ecosystem.config.cjs` — novo app `luma-tunnel` (autorestart, backoff de 5 s).
+
+**Migração:**
+```bash
+pm2 stop luma
+pm2 start ecosystem.config.cjs --only luma-tunnel
+pm2 start ecosystem.config.cjs --only luma
+pm2 save
+```
+
+### Correção: chave de API herdada do processo pai
+
+- `src/config/env.js`: `dotenv.config()` → `dotenv.config({ override: true })`.
+  Antes, se o dashboard atualizava `process.env.DEEPSEEK_API_KEY` via edição de config e depois reiniciava o bot, o bot herdava o valor em memória do dashboard, ignorando o `.env` em disco (dotenv é idempotente por padrão). Com `override: true`, o `.env` é sempre a fonte de verdade para o processo do bot.
+
+---
+
+## [7.0.0] — 2026-05-31
+
+### Resolução de usuários por JID (`UserResolver`, `wa_users`)
+
+- Nova camada `src/core/services/UserResolver.js` — o JID/LID é a identidade técnica estável; o melhor nome humano disponível é escolhido na exibição.
+- Ordem de prioridade do nome: `botNickname` → `pushName` → `notify` → `contato` → `verificado` → fallback `@últimos6` dígitos do identificador técnico.
+- Nova tabela `wa_users` em `luma_private.sqlite` (jid, lid, phone_number, push_name, contact_name, notify_name, verified_name, bot_nickname, timestamps). Campos vazios nunca sobrescrevem dados bons.
+- `ConnectionManager` registra `contacts.upsert` e `contacts.update` para enriquecer perfis a partir dos eventos do Baileys.
+- `MessageRouter` faz upsert do remetente (com `pushName`) e registro básico dos JIDs mencionados em toda mensagem (chokepoint único). Nunca bloqueia o processamento em caso de falha.
+- Comandos `!nick <nome>` (próprio apelido) e `!apelido @fulano <nome>` (apelido de terceiros) via novo `UserPlugin`. `bot_nickname` tem prioridade máxima.
+- `BaileysAdapter.sendText`/`reply` agora repassam `mentions` ao payload (corrige bug onde menções em replies eram ignoradas — ex: a mensagem de kick).
+
+### Ranking de interações com a Luma (`RankPlugin`, `luma_interactions`)
+
+- Conta apenas interações reais com a Luma (trigger/reply/PV), incrementadas em `LumaPlugin.onMessage`. Não conta toda mensagem do grupo nem ações de mídia.
+- Nova tabela `luma_interactions` (group_jid, sender_jid, count, last_at) em `luma_private.sqlite`. `'_pv_'` agrupa conversas privadas no ranking global.
+- Comandos `!rank` (ranking do grupo) e `!rank global` (agregado de todos os chats). Nomes resolvidos via `UserResolver` — a chave de persistência é sempre o JID.
+
+### Lembretes (`ReminderService`, `ReminderScheduler`, tool `schedule_reminder`)
+
+- Agendamento por linguagem natural ("Luma, me lembre de X na próxima terça às 16h") via function calling: a IA calcula o `datetime` ISO 8601 absoluto (fuso `-03:00`) a partir do `{{CURRENT_DATETIME}}` já injetado no prompt; o `ToolDispatcher` valida e persiste.
+- Comando manual `!lembrete DD/MM/AAAA HH:mm | texto` (alias `!lembrar`) via `ReminderPlugin`.
+- Ao disparar, menciona as pessoas marcadas na mensagem (uma ou várias) no grupo, ou avisa no PV. Sem menção, lembra quem criou.
+- Nova tabela `reminders` em `luma_private.sqlite`; `ReminderScheduler` (loop de 30s, iniciado na conexão) recupera lembretes vencidos durante downtime — **sobrevivem a reinícios do bot**.
+- `ReminderService` valida: data no futuro, horizonte máximo de 1 ano, texto não-vazio; deduplica menções.
+
+### Camada de override de configuração (`ConfigStore`, `configSchema`, `configService`)
+
+- `src/config/ConfigStore.js` — overrides persistidos em `data/config-overrides.json` (fora do git) são mesclados (deep-merge) sobre os defaults de `constants.js`/`lumaConfig.js` no boot. Falha de parse cai para os defaults sem derrubar o bot.
+- `src/config/configSchema.js` — esquema declarativo de toda a config editável (env + objetos de config), consumido pelo dashboard e pela validação do backend.
+- `src/config/configService.js` — lê valores atuais (secrets mascarados) e grava alterações: env vai para o `.env` (e atualiza `process.env` para o próximo spawn), config vai para o `ConfigStore`. Mudanças aplicam no restart.
+- `TRIGGERS` editáveis como strings (convertidas de volta para `RegExp` em runtime).
+
+### Dashboard reescrito (Vite + React + TypeScript + Tailwind + shadcn-style)
+
+- Novo app em `dashboard/web/` com identidade visual da marca **Thera** (roxo `#8B2FE0`, azul `#0A6CE0`, dark, off-white), mobile-first e 100% responsivo. Fontes self-hosted (Space Grotesk / IBM Plex Sans / JetBrains Mono) para respeitar o CSP `'self'`.
+- Telas: **Overview** (status, controles start/stop/restart, QR, métricas), **Logs** (tempo real via WebSocket, filtros + busca), **Config** (edita tudo de `src/config` a partir do schema), **Social** (ranking + edição de apelidos), **Lembretes** (listar/cancelar), **Login**.
+- `dashboard/server.js` ganha API REST: `GET/PUT /api/config`, `GET /api/users`, `PUT /api/users/:jid/nick`, `GET /api/ranking`, `GET/DELETE /api/reminders`. Todas protegidas por sessão, secrets mascarados, body ≤10 KB, rate-limit. Sinais de stdout (`[LUMA_QR]`, `[LUMA_STATUS]`) preservados.
+- O servidor serve o build (`dashboard/web/dist`) quando presente; cai no dashboard legado em `src/public` caso contrário.
+
+### Deploy automático e supervisão
+
+- `runDeploy` (webhook `/api/deploy`, push na `main`) agora também roda `npm ci` + `npm run build` do dashboard (regenera o `dist`) e reinicia o próprio processo quando supervisionado — aplicando backend **e** painel sem tocar no servidor.
+- `dashboard/launch.js` — supervisor mínimo: mantém o comando `npm run dashboard` e reinicia o `server.js` no deploy (saída código 0) ou em crash (backoff). Mata o bot-filho ao reiniciar, evitando sessão WhatsApp duplicada.
+- `ecosystem.config.cjs` (PM2) para produção: autorestart + persistência no boot via `pm2 startup`. Marca `LUMA_SUPERVISED=1`.
+- Novos scripts: `dashboard:web:dev`, `dashboard:build`, `pm2:start`, `pm2:restart`. `npm run dashboard` passa a usar o launcher.
+
+### Correções
+
+- `tests/unit/WebSearchService.test.js`: mocka `env.js` (que é congelado no import) para que o ramo Tavily seja exercitado — 2 testes que falhavam por isso agora passam. Suite 100% verde.
+
+---
+
 ## [6.5.0] — 2026-05-05
 
 ### Hardening de Segurança (dashboard, IA, mídia, roteador)
