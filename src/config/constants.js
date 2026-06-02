@@ -35,6 +35,7 @@ export const COMMANDS = ConfigStore.apply("COMMANDS", {
   STICKER_SHORT: "!s",
   IMAGE: "!image",
   IMAGE_SHORT: "!i",
+  PDF: "!pdf",
   GIF: "!gif",
   GIF_SHORT: "!g",
   HELP: "!help",
@@ -52,7 +53,7 @@ export const COMMANDS = ConfigStore.apply("COMMANDS", {
   MY_NUMBER: "!meunumero",
   RESUMO: "!resumo",
   NICK: "!nick",
-  NICK_ALT: "!apelido",
+  NICK_ALT: "!n",
   RANK: "!rank",
   REMINDER: "!lembrete",
   REMINDER_SHORT: "!lembrar",
@@ -64,7 +65,8 @@ export const MENUS = ConfigStore.apply("MENUS", {
     "🎨 *MÍDIA*\n" +
     "• *!sticker* (!s) - Imagem/Vídeo/Link -> Sticker\n" +
     "• *!gif* (!g) - Sticker Animado -> GIF\n" +
-    "• *!image* (!i) - Sticker -> Imagem\n\n" +
+    "• *!image* (!i) - Sticker -> Imagem\n" +
+    "• *!pdf* - Imagem -> PDF\n\n" +
     "🧠 *INTELIGÊNCIA ARTIFICIAL*\n" +
     "• *Luma* - Fale qualquer coisa (ex: 'Luma, bom dia')\n" +
     "• *!persona* - Abre o menu para mudar a Luma\n" +
@@ -74,7 +76,7 @@ export const MENUS = ConfigStore.apply("MENUS", {
     "• *!rank* - Ranking de quem mais interage com a Luma no grupo\n" +
     "• *!rank global* - Ranking geral (todos os chats)\n" +
     "• *!nick SeuNome* - Define como você aparece nos rankings\n" +
-    "• *!apelido @pessoa Nome* - Define o apelido de alguém\n" +
+    "• *!nick @pessoa Nome* - Define o apelido de alguém\n" +
     "• *!lembrete* (ou peça à Luma) - Agenda um lembrete com menção\n\n" +
     "🛠️ *UTILITÁRIOS*\n" +
     "• *!download* (!d) - Baixa vídeo do Twitter/X ou Instagram\n" +
@@ -98,7 +100,9 @@ export const MENUS = ConfigStore.apply("MENUS", {
   },
 });
 
+
 export const MESSAGES = ConfigStore.apply("MESSAGES", {
+
   INITIALIZING: "🤖 WhatsApp Sticker Bot - Conversor Completo",
   STICKER_COMMAND: "🔄 !sticker - Converte imagem/vídeo para sticker",
   IMAGE_COMMAND: "🖼️ !image - Converte sticker para imagem",
@@ -131,4 +135,5 @@ export const MESSAGES = ConfigStore.apply("MESSAGES", {
   AUDIO_SENT: "🎵 Pronto!",
   AUDIO_DOWNLOAD_ERROR: "❌ Não consegui baixar o áudio. O conteúdo pode ser privado ou a URL inválida.",
   YTDLP_NOT_FOUND: "❌ Não foi possível baixar o yt-dlp. Verifique sua conexão e tente novamente.",
+  REPLY_IMAGE_PDF: "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf nome do arquivo",
 });

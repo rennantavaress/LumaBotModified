@@ -5,6 +5,7 @@ vi.mock('../../../src/handlers/MediaProcessor.js', () => ({
     processToSticker:      vi.fn().mockResolvedValue({}),
     processStickerToImage: vi.fn().mockResolvedValue({}),
     processStickerToGif:   vi.fn().mockResolvedValue({}),
+    processImageToPdf:     vi.fn().mockResolvedValue(true),
     processUrlToSticker:   vi.fn().mockResolvedValue({}),
   },
 }));
@@ -39,8 +40,74 @@ describe('MediaPlugin.commands', () => {
     expect(MediaPlugin.commands).toContain(COMMANDS.STICKER_SHORT);
     expect(MediaPlugin.commands).toContain(COMMANDS.IMAGE);
     expect(MediaPlugin.commands).toContain(COMMANDS.IMAGE_SHORT);
+    expect(MediaPlugin.commands).toContain(COMMANDS.PDF);
     expect(MediaPlugin.commands).toContain(COMMANDS.GIF);
     expect(MediaPlugin.commands).toContain(COMMANDS.GIF_SHORT);
+  });
+});
+
+describe('MediaPlugin - !pdf com imagem', () => {
+  it('converte imagem direta para PDF quando hasMedia=true', async () => {
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({ hasMedia: true });
+
+    await plugin.onCommand(COMMANDS.PDF, bot);
+
+    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(bot.raw, bot.socket, null, 'imagem.pdf');
+    expect(bot.react).toHaveBeenCalledWith('✅');
+  });
+
+  it('converte imagem citada para PDF', async () => {
+    const quoted = makeBot({ hasMedia: true, raw: { quoted: true } });
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({ getQuotedAdapter: vi.fn().mockReturnValue(quoted) });
+
+    await plugin.onCommand(COMMANDS.PDF, bot);
+
+    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(quoted.raw, bot.socket, bot.jid, 'imagem.pdf');
+    expect(bot.react).toHaveBeenCalledWith('✅');
+  });
+
+  it('usa nome personalizado quando informado apos !pdf', async () => {
+    const quoted = makeBot({ hasMedia: true, raw: { quoted: true } });
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({
+      body: '!pdf trabalho de fisica',
+      getQuotedAdapter: vi.fn().mockReturnValue(quoted),
+    });
+
+    await plugin.onCommand(COMMANDS.PDF, bot);
+
+    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(
+      quoted.raw,
+      bot.socket,
+      bot.jid,
+      'trabalho-de-fisica.pdf',
+    );
+  });
+
+  it('remove acentos e caracteres invalidos do nome personalizado', async () => {
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({ body: '!pdf Física: lista 01?', hasMedia: true });
+
+    await plugin.onCommand(COMMANDS.PDF, bot);
+
+    expect(MediaProcessor.processImageToPdf).toHaveBeenCalledWith(
+      bot.raw,
+      bot.socket,
+      null,
+      'fisica-lista-01.pdf',
+    );
+  });
+
+  it('responde quando nao ha imagem', async () => {
+    const plugin = new MediaPlugin();
+    const bot    = makeBot();
+
+    await plugin.onCommand(COMMANDS.PDF, bot);
+
+    expect(bot.react).toHaveBeenCalledWith('❌');
+    expect(bot.reply).toHaveBeenCalled();
   });
 });
 

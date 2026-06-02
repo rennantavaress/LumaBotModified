@@ -16,6 +16,8 @@ vi.mock('../../../src/adapters/BaileysAdapter.js', () => ({
       this.sock    = sock;
       this.message = msg;
       this.jid     = msg?.key?.remoteJid ?? 'unknown@s.whatsapp.net';
+      this.isFromMe = !!msg?.key?.fromMe;
+      this.isGroup  = this.jid.endsWith('@g.us');
     }
   },
 }));
@@ -33,7 +35,10 @@ import { MessageHandler } from '../../../src/handlers/MessageHandler.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const mockSock = {};
+const mockSock = {
+  user: { id: '5511999999999:1@s.whatsapp.net' },
+  authState: { creds: { me: { id: '5511999999999:1@s.whatsapp.net' } } },
+};
 
 function makeUpsert(messages, type = 'notify') {
   return { type, messages };
@@ -41,7 +46,7 @@ function makeUpsert(messages, type = 'notify') {
 
 function makeMessage(withMessageField = true, jid = 'jid@s.whatsapp.net') {
   return {
-    key:     { remoteJid: jid, id: 'msg-id' },
+    key:     { remoteJid: jid, id: 'msg-id', fromMe: false },
     message: withMessageField ? { conversation: 'olá' } : undefined,
   };
 }
@@ -121,5 +126,22 @@ describe('routeMessages — roteamento de mensagens', () => {
 
     const [adapterArg] = MessageHandler.process.mock.calls[0];
     expect(adapterArg.jid).toBe('grupo123@g.us');
+  });
+
+  it('ignora mensagens enviadas pelo proprio bot', async () => {
+    const msg = makeMessage();
+    msg.key.fromMe = true;
+
+    const upsert = makeUpsert([msg]);
+    await routeMessages(mockSock, upsert);
+
+    expect(MessageHandler.process).not.toHaveBeenCalled();
+  });
+
+  it('ignora chat privado com o proprio numero conectado', async () => {
+    const upsert = makeUpsert([makeMessage(true, '5511999999999@s.whatsapp.net')]);
+    await routeMessages(mockSock, upsert);
+
+    expect(MessageHandler.process).not.toHaveBeenCalled();
   });
 });

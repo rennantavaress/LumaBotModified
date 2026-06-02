@@ -11,6 +11,7 @@ describe('CommandRouter.detect — comandos', () => {
     ['!s',            '!sticker'],
     ['!image',        '!image'],
     ['!i',            '!image'],
+    ['!pdf',          '!pdf'],
     ['!gif',          '!gif'],
     ['!g',            '!gif'],
     ['!help',         '!help'],

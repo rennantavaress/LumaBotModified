@@ -3,6 +3,26 @@ import { MediaProcessor } from "../../handlers/MediaProcessor.js";
 import { DatabaseService } from "../../services/Database.js";
 import { extractUrl } from "../../utils/MessageUtils.js";
 
+const DEFAULT_PDF_FILENAME = "imagem.pdf";
+
+function getPdfFileName(body) {
+  const rawName = body
+    ?.replace(new RegExp(`^\\s*${COMMANDS.PDF}\\s*`, "i"), "")
+    .trim();
+
+  if (!rawName) return DEFAULT_PDF_FILENAME;
+
+  const slug = rawName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  return slug ? `${slug}.pdf` : DEFAULT_PDF_FILENAME;
+}
+
 /**
  * Plugin de mídia: converte imagens/vídeos em stickers, stickers em imagens/GIFs.
  * Comandos: !sticker (!s), !image (!i), !gif (!g)
@@ -13,6 +33,7 @@ export class MediaPlugin {
     COMMANDS.STICKER_SHORT,
     COMMANDS.IMAGE,
     COMMANDS.IMAGE_SHORT,
+    COMMANDS.PDF,
     COMMANDS.GIF,
     COMMANDS.GIF_SHORT,
   ];
@@ -25,6 +46,8 @@ export class MediaPlugin {
       case COMMANDS.IMAGE:
       case COMMANDS.IMAGE_SHORT:
         return this.#handleImage(bot);
+      case COMMANDS.PDF:
+        return this.#handlePdf(bot);
       case COMMANDS.GIF:
       case COMMANDS.GIF_SHORT:
         return this.#handleGif(bot);
@@ -73,6 +96,27 @@ export class MediaPlugin {
     } else {
       await bot.react("❌");
       await bot.reply(MESSAGES.REPLY_STICKER_IMAGE);
+    }
+  }
+
+  async #handlePdf(bot) {
+    await bot.react("⏳");
+    const fileName = getPdfFileName(bot.body);
+
+    if (bot.hasMedia) {
+      const ok = await MediaProcessor.processImageToPdf(bot.raw, bot.socket, null, fileName);
+      if (ok) MediaPlugin.#incrementMedia("pdfs_created");
+      await bot.react(ok ? "✅" : "❌");
+      return;
+    }
+    const quoted = bot.getQuotedAdapter();
+    if (quoted?.hasMedia) {
+      const ok = await MediaProcessor.processImageToPdf(quoted.raw, bot.socket, bot.jid, fileName);
+      if (ok) MediaPlugin.#incrementMedia("pdfs_created");
+      await bot.react(ok ? "✅" : "❌");
+    } else {
+      await bot.react("❌");
+      await bot.reply(MESSAGES.REPLY_IMAGE_PDF);
     }
   }
 

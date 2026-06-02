@@ -91,6 +91,18 @@ async function sendText(sock, jid, text) {
   }
 }
 
+function ensurePdfFileName(fileName) {
+  const cleanName = String(fileName || "imagem.pdf")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 84);
+
+  if (!cleanName) return "imagem.pdf";
+  return cleanName.toLowerCase().endsWith(".pdf") ? cleanName : `${cleanName}.pdf`;
+}
+
 export class MediaProcessor {
   static async processToSticker(message, sock, targetJid = null) {
     if (message.message?.viewOnceMessage || message.message?.viewOnceMessageV2) {
@@ -143,6 +155,38 @@ export class MediaProcessor {
     } catch (error) {
       Logger.error("Erro:", error);
       await sendText(sock, targetJid || message.key.remoteJid, MESSAGES.CONVERSION_ERROR);
+    }
+  }
+
+  static async processImageToPdf(message, sock, targetJid = null, fileName = "imagem.pdf") {
+    try {
+      const jid = targetJid || message.key.remoteJid;
+      const type = getMessageType(message);
+
+      if (type !== "image") {
+        await sendText(sock, jid, MESSAGES.REPLY_IMAGE_PDF);
+        return false;
+      }
+
+      const buffer = await this.downloadMedia(message, sock);
+
+      if (!buffer) {
+        await sendText(sock, jid, MESSAGES.DOWNLOAD_ERROR);
+        return false;
+      }
+
+      const pdfBuffer = await ImageProcessor.toPdf(buffer);
+      await sock.sendMessage(jid, {
+        document: pdfBuffer,
+        mimetype: "application/pdf",
+        fileName: ensurePdfFileName(fileName),
+      });
+      Logger.info("✅ PDF enviado");
+      return true;
+    } catch (error) {
+      Logger.error("Erro ao converter imagem para PDF:", error);
+      await sendText(sock, targetJid || message.key.remoteJid, MESSAGES.CONVERSION_ERROR);
+      return false;
     }
   }
 
