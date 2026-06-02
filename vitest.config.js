@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
  *
  * Usamos o runner nativo de ESM (sem transpilação), já que o projeto
  * é 100% ESM ("type": "module" no package.json). O coverage via v8
- * não requer instrumentação adicional de código — apenas a flag --coverage.
+ * não requer instrumentação adicional de código — apenas a flag --coverage
  */
 export default defineConfig({
   test: {
