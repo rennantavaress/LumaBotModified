@@ -53,7 +53,7 @@ export const COMMANDS = ConfigStore.apply("COMMANDS", {
   MY_NUMBER: "!meunumero",
   RESUMO: "!resumo",
   NICK: "!nick",
-  NICK_ALT: "!n",
+  NICK_ALT: "!apelido",
   RANK: "!rank",
   REMINDER: "!lembrete",
   REMINDER_SHORT: "!lembrar",
