@@ -31,9 +31,9 @@ export class CommandRouter {
     if (lower.includes(COMMANDS.HELP) || lower === "!menu") return COMMANDS.HELP;
     if (lower.startsWith(COMMANDS.PERSONA))        return COMMANDS.PERSONA;
     if (lower.startsWith(COMMANDS.AUDIO_DOWNLOAD))       return COMMANDS.AUDIO_DOWNLOAD;
-    if (lower.startsWith(COMMANDS.AUDIO_DOWNLOAD_SHORT)) return COMMANDS.AUDIO_DOWNLOAD;
+    if (lower === COMMANDS.AUDIO_DOWNLOAD_SHORT || lower.startsWith(COMMANDS.AUDIO_DOWNLOAD_SHORT + " ")) return COMMANDS.AUDIO_DOWNLOAD;
     if (lower.startsWith(COMMANDS.DOWNLOAD))        return COMMANDS.DOWNLOAD;
-    if (lower.startsWith(COMMANDS.DOWNLOAD_SHORT))  return COMMANDS.DOWNLOAD;
+    if (lower === COMMANDS.DOWNLOAD_SHORT || lower.startsWith(COMMANDS.DOWNLOAD_SHORT + " "))  return COMMANDS.DOWNLOAD;
     if (lower.startsWith(COMMANDS.RESUMO))         return COMMANDS.RESUMO;
     if (lower.startsWith(COMMANDS.NICK_ALT))       return COMMANDS.NICK_ALT;
     if (lower.startsWith(COMMANDS.NICK))           return COMMANDS.NICK;
