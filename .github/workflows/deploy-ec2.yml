@@ -14,7 +14,6 @@ on:
 
 env:
   AWS_REGION: us-east-2
-  GHCR_IMAGE: ghcr.io/${{ github.repository }}/bulma-bot
   EC2_TAG_NAME: luma-bot-production
 
 permissions:
@@ -28,6 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set environment variables
+        run: |
+          echo "GHCR_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/bulma-bot" >> $GITHUB_ENV
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
