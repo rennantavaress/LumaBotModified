@@ -22,8 +22,3 @@ output "ec2_role_arn" {
   description = "ARN da IAM role da EC2"
   value       = aws_iam_role.luma_bot_ec2.arn
 }
-
-output "gh_actions_role_arn" {
-  description = "ARN da IAM role do GitHub Actions"
-  value       = aws_iam_role.luma_bot_gh_actions.arn
-}
