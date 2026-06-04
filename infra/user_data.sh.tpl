@@ -114,8 +114,8 @@ services:
       - luma-prod
 
   app:
-    image: ghcr.io/$${GITHUB_REPO_LOWER}/bulma-bot:latest
-    container_name: bulma-bot
+    image: ghcr.io/$${GITHUB_REPO_LOWER}/luma-bot:latest
+    container_name: luma-bot
     restart: unless-stopped
     expose:
       - "3000"
@@ -166,7 +166,7 @@ NGINX_CONF
 cat > /app/nginx/conf.d/default.conf << NGINX_SITE
 upstream luma_backend {
   least_conn;
-  server bulma-bot:3000 max_fails=3 fail_timeout=30s;
+  server luma-bot:3000 max_fails=3 fail_timeout=30s;
 }
 server {
   listen 80;

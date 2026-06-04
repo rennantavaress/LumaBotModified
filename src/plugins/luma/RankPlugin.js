@@ -5,8 +5,8 @@ import { UserResolver } from "../../core/services/UserResolver.js";
 /**
  * Plugin de ranking: quem mais interage com a Luma.
  *
- * - !classif        → ranking do grupo atual (ou global em PV)
- * - !classif global → ranking agregado de todos os chats
+ * - !rank        → ranking do grupo atual (ou global em PV)
+ * - !rank global → ranking agregado de todos os chats
  *
  * Os nomes são resolvidos pelo UserResolver na hora da exibição — a chave de
  * persistência é sempre o JID, nunca o nome.

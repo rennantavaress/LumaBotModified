@@ -247,7 +247,7 @@ export class ToolDispatcher {
             const config = PersonalityManager.getPersonaConfig(bot.jid);
             await bot.reply(`🎭 Personalidade alterada para *${config.name}*!`);
         } else {
-            await bot.reply("⚠️ Não conheço essa personalidade. Usa !alma pra ver as opções!");
+            await bot.reply("⚠️ Não conheço essa personalidade. Usa !persona pra ver as opções!");
         }
     }
 

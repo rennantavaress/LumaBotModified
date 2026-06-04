@@ -4,8 +4,8 @@ import { UserResolver } from "../../core/services/UserResolver.js";
 /**
  * Plugin de identidade de usuário: apelidos manuais.
  *
- * - !apelido <nome>          → define o apelido de quem enviou
- * - !alcunha @fulano <nome>  → define o apelido da pessoa mencionada
+ * - !nick <nome>            → define o apelido de quem enviou
+ * - !apelido @fulano <nome> → define o apelido da pessoa mencionada
  *
  * O apelido tem prioridade máxima na exibição (rankings, lembretes, logs),
  * resolvendo casos de JID @lid, pushName ausente ou nome desatualizado.
@@ -19,7 +19,7 @@ export class UserPlugin {
     if (command === COMMANDS.NICK) {
       const nick = body.slice(COMMANDS.NICK.length).trim();
       if (!nick) {
-        await bot.reply("ℹ️ Uso: *!apelido SeuNome*");
+        await bot.reply("ℹ️ Uso: *!nick SeuNome*");
         return;
       }
       UserResolver.setNickname(bot.senderJid, nick);
@@ -27,10 +27,10 @@ export class UserPlugin {
       return;
     }
 
-    // !alcunha @fulano <nome>
+    // !apelido @fulano <nome>
     const mentioned = await bot.getMentionedJids();
     if (mentioned.length === 0) {
-      await bot.reply("ℹ️ Uso: *!alcunha @pessoa Nome*");
+      await bot.reply("ℹ️ Uso: *!apelido @pessoa Nome*");
       return;
     }
     const target = mentioned[0];
@@ -40,7 +40,7 @@ export class UserPlugin {
       .replace(/@\d+/g, "")
       .trim();
     if (!nick) {
-      await bot.reply("ℹ️ Uso: *!alcunha @pessoa Nome*");
+      await bot.reply("ℹ️ Uso: *!apelido @pessoa Nome*");
       return;
     }
     UserResolver.setNickname(target, nick);

@@ -26,71 +26,71 @@ export const CONFIG = ConfigStore.apply("CONFIG", {
 });
 
 export const STICKER_METADATA = ConfigStore.apply("STICKER_METADATA", {
-  PACK_NAME: "BulmaBot  Stickers",
-  AUTHOR: "Criado com ❤️ por BulmaBot",
+  PACK_NAME: "LumaBot  Stickers",
+  AUTHOR: "Criado com ❤️ por LumaBot",
 });
 
 export const COMMANDS = ConfigStore.apply("COMMANDS", {
-  STICKER: "!fig",
-  STICKER_SHORT: "!f",
+  STICKER: "!sticker",
+  STICKER_SHORT: "!s",
   IMAGE: "!image",
   IMAGE_SHORT: "!i",
   PDF: "!pdf",
   GIF: "!gif",
   GIF_SHORT: "!g",
-  HELP: "!ajuda",
-  PERSONA: "!alma",
+  HELP: "!help",
+  PERSONA: "!persona",
   EVERYONE: "@everyone",
-  DOWNLOAD_SHORT: "!bx",
-  DOWNLOAD: "!baixar",
-  AUDIO_DOWNLOAD: "!mp3",
-  AUDIO_DOWNLOAD_SHORT: "!m",
-  LUMA_STATS: "!bulma stats",
-  LUMA_STATS_SHORT: "!bs",
-  LUMA_CLEAR: "!bulma clear",
-  LUMA_CLEAR_SHORT: "!bc",
-  LUMA_CLEAR_ALT: "!esquecer",
-  MY_NUMBER: "!meuid",
-  RESUMO: "!sumario",
-  NICK: "!apelido",
-  NICK_ALT: "!alcunha",
-  RANK: "!classif",
-  REMINDER: "!alerta",
-  REMINDER_SHORT: "!aviso",
+  DOWNLOAD_SHORT: "!d",
+  DOWNLOAD: "!download",
+  AUDIO_DOWNLOAD: "!audio",
+  AUDIO_DOWNLOAD_SHORT: "!a",
+  LUMA_STATS: "!luma stats",
+  LUMA_STATS_SHORT: "!ls",
+  LUMA_CLEAR: "!luma clear",
+  LUMA_CLEAR_SHORT: "!lc",
+  LUMA_CLEAR_ALT: "!clear",
+  MY_NUMBER: "!meunumero",
+  RESUMO: "!resumo",
+  NICK: "!nick",
+  NICK_ALT: "!apelido",
+  RANK: "!rank",
+  REMINDER: "!lembrete",
+  REMINDER_SHORT: "!lembrar",
 });
 
 export const MENUS = ConfigStore.apply("MENUS", {
   HELP_TEXT:
     "🤖 *LISTA DE COMANDOS* 🤖\n\n" +
     "🎨 *MÍDIA*\n" +
-    "• *!fig* (!f) - Imagem/Vídeo/Link -> Sticker\n" +
+    "• *!sticker* (!s) - Imagem/Vídeo/Link -> Sticker\n" +
     "• *!gif* (!g) - Sticker Animado -> GIF\n" +
     "• *!image* (!i) - Sticker -> Imagem\n" +
     "• *!pdf* - Imagem -> PDF\n\n" +
     "🧠 *INTELIGÊNCIA ARTIFICIAL*\n" +
-    "• *Bulma* - Fale qualquer coisa (ex: 'Bulma, bom dia')\n" +
-    "• *!alma* - Abre o menu para mudar a Bulma\n" +
-    "• *!bulma clear* (!bc ou !esquecer) - Limpa memória da conversa\n" +
-    "• *!bulma stats* (!bs) - Mostra estatísticas da Bulma\n\n" +
+    "• *Luma* - Fale qualquer coisa (ex: 'Luma, bom dia')\n" +
+    "• *!persona* - Abre o menu para mudar a Luma\n" +
+    "• *!luma clear* (!lc ou !clear) - Limpa memória da conversa\n" +
+    "• *!luma stats* (!ls) - Mostra estatísticas da Luma\n\n" +
     "🏆 *SOCIAL*\n" +
-    "• *!classif* - Ranking de quem mais interage com a Bulma no grupo\n" +
-    "• *!classif global* - Ranking geral (todos os chats)\n" +
-    "• *!apelido SeuNome* - Define como você aparece nos rankings\n" +
-    "• *!apelido @pessoa Nome* - Define o apelido de alguém\n" +
-    "• *!alerta* (ou peça à Bulma) - Agenda um lembrete com menção\n\n" +
+    "• *!rank* - Ranking de quem mais interage com a Luma no grupo\n" +
+    "• *!rank global* - Ranking geral (todos os chats)\n" +
+    "• *!nick SeuNome* - Define como você aparece nos rankings\n" +
+    "• *!nick @pessoa Nome* - Define o apelido de alguém\n" +
+    "• *!lembrete* (ou peça à Luma) - Agenda um lembrete com menção\n\n" +
     "🛠️ *UTILITÁRIOS*\n" +
-    "• *!baixar* (!bx) - Baixa vídeo do Twitter/X ou Instagram\n" +
-    "• *!mp3* (!m) - Baixa somente o áudio (MP3) de qualquer link\n" +
-    "• *!meuid* - Vê seu ID/Número\n" +
-    "• *!sumario* (ex: !sumario 30) - Resume as últimas mensagens da conversa\n" +
-    "• *!ajuda* - Mostra essa lista\n" +
+    "• *!download* (!d) - Baixa vídeo do Twitter/X ou Instagram\n" +
+    "• *!audio* (!a) - Baixa somente o áudio (MP3) de qualquer link\n" +
+    "• *!meunumero* - Vê seu ID/Número\n" +
+    "• *!resumo* (ex: !resumo 30) - Resume as últimas mensagens da conversa\n" +
+    "• *!help* - Mostra essa lista\n" +
     "• *@everyone* ou *@todos* - Marca todos os membros do grupo\n\n" +
     "👮 *AUTOR*\n" +
     "• Feito por Murilo Castelhano\n" +
-    "• Repositório: https://github.com/murillous/BulmaBot",
+    "• Repositório: https://github.com/murillous/LumaBot",
 
   PERSONALITY: {
-    HEADER: "🎭 *CONFIGURAÇÃO DA BULMA*\n_Responda com o código (ex: p1):_\n",
+    HEADER: "🎭 *CONFIGURAÇÃO DA LUMA*\n_Responda com o código (ex: p1):_\n",
     FOOTER: "\n_A mudança é aplicada imediatamente neste chat._",
   },
 
@@ -103,17 +103,17 @@ export const MENUS = ConfigStore.apply("MENUS", {
 
 export const MESSAGES = ConfigStore.apply("MESSAGES", {
 
-  INITIALIZING: "🤖 BulmaBot - Assistente WhatsApp",
-  STICKER_COMMAND: "🔄 !fig - Converte imagem/vídeo para sticker",
+  INITIALIZING: "🤖 WhatsApp Sticker Bot - Conversor Completo",
+  STICKER_COMMAND: "🔄 !sticker - Converte imagem/vídeo para sticker",
   IMAGE_COMMAND: "🖼️ !image - Converte sticker para imagem",
   GIF_COMMAND: "🎬 !gif - Converte sticker animado para GIF",
   WAITING_QR: "📱 Aguarde o QR Code...",
   CONNECTING: "🔄 Iniciando conexão com WhatsApp...",
   CONNECTED: "✅ Conectado com sucesso!",
-  BOT_READY: "🎯 BulmaBot pronto para uso",
+  BOT_READY: "🎯 Bot pronto para uso",
   DISCONNECTED: "❌ Conexão fechada:",
-  SEND_MEDIA_STICKER: "ℹ️ Envie uma mídia com !fig",
-  REPLY_MEDIA_STICKER: "ℹ️ Responda a uma imagem/vídeo com !fig",
+  SEND_MEDIA_STICKER: "ℹ️ Envie uma mídia com !sticker",
+  REPLY_MEDIA_STICKER: "ℹ️ Responda a uma imagem/vídeo com !sticker",
   SEND_STICKER_IMAGE: "ℹ️ Envie um sticker com !image",
   REPLY_STICKER_IMAGE: "ℹ️ Responda a um sticker com !image",
   SEND_STICKER_GIF: "ℹ️ Envie um sticker animado com !gif",
@@ -130,8 +130,8 @@ export const MESSAGES = ConfigStore.apply("MESSAGES", {
   VIDEO_SENT: "🎬 Pronto!",
   VIDEO_TOO_LARGE: "❌ Vídeo muito grande para enviar (máx. ~50MB).",
   VIDEO_DOWNLOAD_ERROR: "❌ Não consegui baixar esse vídeo. O conteúdo pode ser privado ou a URL inválida.",
-  VIDEO_NO_URL: "ℹ️ Cole o link do vídeo junto com o comando.\nEx: `!baixar https://x.com/...`",
-  AUDIO_NO_URL: "ℹ️ Cole o link junto com o comando.\nEx: `!mp3 https://youtu.be/...`",
+  VIDEO_NO_URL: "ℹ️ Cole o link do vídeo junto com o comando.\nEx: `!download https://x.com/...`",
+  AUDIO_NO_URL: "ℹ️ Cole o link junto com o comando.\nEx: `!audio https://youtu.be/...`",
   AUDIO_SENT: "🎵 Pronto!",
   AUDIO_DOWNLOAD_ERROR: "❌ Não consegui baixar o áudio. O conteúdo pode ser privado ou a URL inválida.",
   YTDLP_NOT_FOUND: "❌ Não foi possível baixar o yt-dlp. Verifique sua conexão e tente novamente.",

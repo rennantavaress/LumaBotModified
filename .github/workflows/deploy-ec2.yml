@@ -1,4 +1,4 @@
-name: Deploy BulmaBot to EC2
+name: Deploy LumaBot to EC2
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo "GHCR_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/bulma-bot" >> $GITHUB_ENV
+          echo "GHCR_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/luma-bot" >> $GITHUB_ENV
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -82,7 +82,7 @@ jobs:
               "sleep 10",
               "curl -sf http://localhost:3000/health && echo \"\\n✅ Health check passed\" || echo \"\\n⚠️ Health check failed\""
             ]}' \
-            --comment "Deploy BulmaBot ${{ github.sha }}" \
+            --comment "Deploy LumaBot ${{ github.sha }}" \
             --output text \
             --query 'Command.CommandId')
           echo "command_id=$COMMAND_ID" >> $GITHUB_OUTPUT
@@ -120,4 +120,4 @@ jobs:
             --query 'Reservations[0].Instances[0].PublicIpAddress' \
             --output text)
           echo "Checking http://$IP/health ..."
-          curl -sf "http://$IP/health" && echo "✅ BulmaBot is healthy!" || echo "⚠️ Health check failed - check logs"
+          curl -sf "http://$IP/health" && echo "✅ LumaBot is healthy!" || echo "⚠️ Health check failed - check logs"
