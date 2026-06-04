@@ -58,6 +58,7 @@ variable "gemini_api_key" {
   description = "API key Gemini"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "openai_api_key" {
