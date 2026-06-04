@@ -199,7 +199,7 @@ export class BaileysAdapter extends MessagingPort {
    */
   get quotedSenderName() {
     if (!this.quotedMessage) return null;
-    if (this.isRepliedToMe) return 'Luma';
+    if (this.isRepliedToMe) return 'Bulma';
 
     const msg = this.innerMessage;
     const context =

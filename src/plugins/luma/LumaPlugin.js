@@ -7,7 +7,7 @@ import { LUMA_CONFIG } from "../../config/lumaConfig.js";
 /**
  * Plugin principal da Luma: gerencia histórico, personalidade, stats e respostas de IA.
  *
- * Comandos: !luma clear (!lc, !clear), !luma stats (!ls), !persona
+ * Comandos: !bulma clear (!bc, !esquecer), !bulma stats (!bs), !alma
  * onMessage: responde em PV, quando citada, ou quando acionada por trigger
  */
 export class LumaPlugin {

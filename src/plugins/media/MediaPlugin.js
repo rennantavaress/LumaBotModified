@@ -25,7 +25,7 @@ function getPdfFileName(body) {
 
 /**
  * Plugin de mídia: converte imagens/vídeos em stickers, stickers em imagens/GIFs.
- * Comandos: !sticker (!s), !image (!i), !gif (!g)
+ * Comandos: !fig (!f), !image (!i), !gif (!g)
  */
 export class MediaPlugin {
   static commands = [
