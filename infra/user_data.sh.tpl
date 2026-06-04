@@ -7,9 +7,15 @@ ENVIRONMENT="${environment}"
 hostnamectl set-hostname "luma-bot-${environment}"
 echo "127.0.0.1 luma-bot-${environment}" >> /etc/hosts
 
-dnf install -y docker docker-compose-plugin
+dnf install -y docker
 systemctl enable --now docker
 usermod -aG docker ec2-user
+
+# docker compose v2 CLI plugin (not bundled in AL2023's docker package)
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
+  -o /usr/libexec/docker/cli-plugins/docker-compose
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
 mkdir -p /app/auth_info /app/data
 chown -R ec2-user:ec2-user /app
@@ -30,29 +36,29 @@ ENV_EOF
 chown ec2-user:ec2-user /app/.env
 chmod 600 /app/.env
 
-cat > /usr/local/bin/cloudflare-ddns.sh << DDNS_SCRIPT
+cat > /usr/local/bin/cloudflare-ddns.sh << 'DDNS_SCRIPT'
 #!/bin/bash
 set -e
 
-DOMAIN="\${1}"
-ZONE_ID="\${2}"
-API_TOKEN="\${3}"
+DOMAIN="$${1}"
+ZONE_ID="$${2}"
+API_TOKEN="$${3}"
 
-CURRENT_IP=\$(curl -s ifconfig.me)
-DNS_RECORD=\$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/\${ZONE_ID}/dns_records?type=A&name=\${DOMAIN}" \
-  -H "Authorization: Bearer \${API_TOKEN}" \
+CURRENT_IP=$(curl -s ifconfig.me)
+DNS_RECORD=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$${ZONE_ID}/dns_records?type=A&name=$${DOMAIN}" \
+  -H "Authorization: Bearer $${API_TOKEN}" \
   -H "Content-Type: application/json")
-DNS_IP=\$(echo "\${DNS_RECORD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result'][0]['content'] if d['result'] else '')" 2>/dev/null)
-RECORD_ID=\$(echo "\${DNS_RECORD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result'][0]['id'] if d['result'] else '')" 2>/dev/null)
+DNS_IP=$(echo "$${DNS_RECORD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result'][0]['content'] if d['result'] else '')" 2>/dev/null)
+RECORD_ID=$(echo "$${DNS_RECORD}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result'][0]['id'] if d['result'] else '')" 2>/dev/null)
 
-if [ "\${CURRENT_IP}" != "\${DNS_IP}" ] && [ -n "\${RECORD_ID}" ]; then
-  curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/\${ZONE_ID}/dns_records/\${RECORD_ID}" \
-    -H "Authorization: Bearer \${API_TOKEN}" \
+if [ "$${CURRENT_IP}" != "$${DNS_IP}" ] && [ -n "$${RECORD_ID}" ]; then
+  curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$${ZONE_ID}/dns_records/$${RECORD_ID}" \
+    -H "Authorization: Bearer $${API_TOKEN}" \
     -H "Content-Type: application/json" \
-    -d "{\"type\":\"A\",\"name\":\"\${DOMAIN}\",\"content\":\"\${CURRENT_IP}\",\"ttl\":120,\"proxied\":false}"
-  echo "[\$(date)] DDNS updated: \${DNS_IP} -> \${CURRENT_IP}" >> /var/log/cloudflare-ddns.log
+    -d "{\"type\":\"A\",\"name\":\"$${DOMAIN}\",\"content\":\"$${CURRENT_IP}\",\"ttl\":120,\"proxied\":false}"
+  echo "[$(date)] DDNS updated: $${DNS_IP} -> $${CURRENT_IP}" >> /var/log/cloudflare-ddns.log
 else
-  echo "[\$(date)] DDNS no change: \${CURRENT_IP}" >> /var/log/cloudflare-ddns.log
+  echo "[$(date)] DDNS no change: $${CURRENT_IP}" >> /var/log/cloudflare-ddns.log
 fi
 DDNS_SCRIPT
 

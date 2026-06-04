@@ -13,7 +13,7 @@ variable "instance_type" {
 variable "instance_ami" {
   description = "AMI ID (Amazon Linux 2023 us-east-2)"
   type        = string
-  default     = "ami-0df24ca1486a70a9c"
+  default     = "ami-078f95be0757084a3"
 }
 
 variable "ssh_key_name" {
