@@ -15,6 +15,19 @@ COPY package*.json ./
 RUN npm ci --only=production && \
     npm cache clean --force
 
+FROM node:20-slim as dashboard-build
+
+WORKDIR /app/dashboard/web
+
+COPY dashboard/web/package*.json ./
+
+RUN npm ci && \
+    npm cache clean --force
+
+COPY dashboard/web/ ./
+
+RUN npm run build
+
 FROM node:20-slim
 
 WORKDIR /app
@@ -31,6 +44,7 @@ COPY --chown=node:node package*.json ./
 COPY --chown=node:node src ./src
 COPY --chown=node:node index.js ./
 COPY --chown=node:node dashboard ./dashboard
+COPY --from=dashboard-build --chown=node:node /app/dashboard/web/dist ./dashboard/web/dist
 COPY --chown=node:node docker/docker-entrypoint.sh /docker-entrypoint.sh
 
 RUN mkdir -p auth_info data && \
