@@ -93,6 +93,8 @@ SYSTEMD_TIMER
 systemctl daemon-reload
 systemctl enable --now cloudflare-ddns.timer
 
+GITHUB_REPO_LOWER=$(echo "${github_repo}" | tr '[:upper:]' '[:lower:]')
+
 cat > /app/docker-compose.yml << DOCKER_COMPOSE
 services:
   nginx:
@@ -112,7 +114,7 @@ services:
       - luma-prod
 
   app:
-    image: ghcr.io/${github_repo}/bulma-bot:latest
+    image: ghcr.io/$${GITHUB_REPO_LOWER}/bulma-bot:latest
     container_name: bulma-bot
     restart: unless-stopped
     expose:
