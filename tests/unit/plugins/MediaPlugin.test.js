@@ -7,6 +7,13 @@ vi.mock('../../../src/handlers/MediaProcessor.js', () => ({
     processStickerToGif:   vi.fn().mockResolvedValue({}),
     processImageToPdf:     vi.fn().mockResolvedValue(true),
     processUrlToSticker:   vi.fn().mockResolvedValue({}),
+    downloadMedia:         vi.fn().mockResolvedValue(Buffer.from('pdf')),
+  },
+}));
+
+vi.mock('../../../src/processors/PdfProcessor.js', () => ({
+  PdfProcessor: {
+    merge: vi.fn().mockResolvedValue(Buffer.from('merged-pdf')),
   },
 }));
 
@@ -16,6 +23,7 @@ vi.mock('../../../src/services/Database.js', () => ({
 
 const { MediaPlugin } = await import('../../../src/plugins/media/MediaPlugin.js');
 const { MediaProcessor } = await import('../../../src/handlers/MediaProcessor.js');
+const { PdfProcessor } = await import('../../../src/processors/PdfProcessor.js');
 const { COMMANDS } = await import('../../../src/config/constants.js');
 
 function makeBot(overrides = {}) {
@@ -25,11 +33,16 @@ function makeBot(overrides = {}) {
     raw: {},
     socket: {},
     hasMedia: false,
+    hasPdf: false,
+    quotedHasPdf: false,
     hasSticker: false,
     hasVisualContent: false,
+    isGroup: false,
+    senderJid: 'sender@s.whatsapp.net',
     getQuotedAdapter: vi.fn().mockReturnValue(null),
     react: vi.fn().mockResolvedValue({}),
     reply: vi.fn().mockResolvedValue({}),
+    sendMessage: vi.fn().mockResolvedValue({}),
     ...overrides,
   };
 }
@@ -41,6 +54,8 @@ describe('MediaPlugin.commands', () => {
     expect(MediaPlugin.commands).toContain(COMMANDS.IMAGE);
     expect(MediaPlugin.commands).toContain(COMMANDS.IMAGE_SHORT);
     expect(MediaPlugin.commands).toContain(COMMANDS.PDF);
+    expect(MediaPlugin.commands).toContain(COMMANDS.PDF_MERGE);
+    expect(MediaPlugin.commands).toContain(COMMANDS.PDF_MERGE_ALT);
     expect(MediaPlugin.commands).toContain(COMMANDS.GIF);
     expect(MediaPlugin.commands).toContain(COMMANDS.GIF_SHORT);
   });
@@ -111,6 +126,66 @@ describe('MediaPlugin - !pdf com imagem', () => {
   });
 });
 
+describe('MediaPlugin - !juntarpdf', () => {
+  it('adiciona PDF direto na fila do chat', async () => {
+    const plugin = new MediaPlugin();
+    const bot = makeBot({
+      jid: 'merge-add@s.whatsapp.net',
+      body: '!juntarpdf',
+      hasPdf: true,
+      raw: { pdf: 1 },
+    });
+
+    await plugin.onCommand(COMMANDS.PDF_MERGE, bot);
+
+    expect(MediaProcessor.downloadMedia).toHaveBeenCalledWith(bot.raw, bot.socket);
+    expect(bot.reply).toHaveBeenCalledWith(expect.stringContaining('(1)'));
+  });
+
+  it('adiciona PDF citado na fila do chat', async () => {
+    const quoted = makeBot({ hasPdf: true, raw: { quotedPdf: 1 } });
+    const plugin = new MediaPlugin();
+    const bot = makeBot({
+      jid: 'merge-quoted@s.whatsapp.net',
+      body: '!juntarpdf',
+      quotedHasPdf: true,
+      getQuotedAdapter: vi.fn().mockReturnValue(quoted),
+    });
+
+    await plugin.onCommand(COMMANDS.PDF_MERGE, bot);
+
+    expect(MediaProcessor.downloadMedia).toHaveBeenCalledWith(quoted.raw, bot.socket);
+    expect(bot.reply).toHaveBeenCalledWith(expect.stringContaining('(1)'));
+  });
+
+  it('junta PDFs acumulados e envia documento final', async () => {
+    const plugin = new MediaPlugin();
+    const base = { jid: 'merge-finish@s.whatsapp.net', hasPdf: true };
+
+    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!juntarpdf', raw: { pdf: 1 } }));
+    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!juntarpdf', raw: { pdf: 2 } }));
+
+    const finishBot = makeBot({ jid: base.jid, body: '!juntarpdf pronto trabalho final' });
+    await plugin.onCommand(COMMANDS.PDF_MERGE, finishBot);
+
+    expect(PdfProcessor.merge).toHaveBeenCalledWith([Buffer.from('pdf'), Buffer.from('pdf')]);
+    expect(finishBot.sendMessage).toHaveBeenCalledWith(base.jid, {
+      document: Buffer.from('merged-pdf'),
+      mimetype: 'application/pdf',
+      fileName: 'trabalho-final.pdf',
+    });
+  });
+
+  it('pede ao menos 2 PDFs antes de finalizar', async () => {
+    const plugin = new MediaPlugin();
+    const bot = makeBot({ jid: 'merge-empty@s.whatsapp.net', body: '!juntarpdf pronto' });
+
+    await plugin.onCommand(COMMANDS.PDF_MERGE, bot);
+
+    expect(bot.reply).toHaveBeenCalledWith(expect.stringContaining('2 PDFs'));
+  });
+});
+
 describe('MediaPlugin — !sticker com URL no body', () => {
   it('processa URL como sticker e reage ✅', async () => {
     const plugin = new MediaPlugin();
@@ -130,8 +205,42 @@ describe('MediaPlugin — !sticker com mídia direta', () => {
 
     await plugin.onCommand(COMMANDS.STICKER, bot);
 
-    expect(MediaProcessor.processToSticker).toHaveBeenCalledWith(bot.raw, bot.socket);
+    expect(MediaProcessor.processToSticker).toHaveBeenCalledWith(bot.raw, bot.socket, null, { text: null });
     expect(bot.react).toHaveBeenCalledWith('✅');
+  });
+});
+
+describe('MediaPlugin - !sticker com texto', () => {
+  it('passa texto da legenda para figurinha com midia direta', async () => {
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({ body: '!sticker bom dia', hasMedia: true });
+
+    await plugin.onCommand(COMMANDS.STICKER, bot);
+
+    expect(MediaProcessor.processToSticker).toHaveBeenCalledWith(
+      bot.raw,
+      bot.socket,
+      null,
+      { text: 'bom dia' },
+    );
+  });
+
+  it('passa texto da legenda para figurinha com imagem citada', async () => {
+    const quoted = makeBot({ hasVisualContent: true, raw: { quoted: true } });
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({
+      body: '!s texto da figurinha',
+      getQuotedAdapter: vi.fn().mockReturnValue(quoted),
+    });
+
+    await plugin.onCommand(COMMANDS.STICKER, bot);
+
+    expect(MediaProcessor.processToSticker).toHaveBeenCalledWith(
+      quoted.raw,
+      bot.socket,
+      bot.jid,
+      { text: 'texto da figurinha' },
+    );
   });
 });
 

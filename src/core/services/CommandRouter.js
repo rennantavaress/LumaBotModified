@@ -25,6 +25,8 @@ export class CommandRouter {
     if (lower.includes(COMMANDS.IMAGE))            return COMMANDS.IMAGE;
     if (lower.includes(COMMANDS.IMAGE_SHORT))      return COMMANDS.IMAGE;
     if (lower.startsWith(COMMANDS.PDF))            return COMMANDS.PDF;
+    if (lower.startsWith(COMMANDS.PDF_MERGE))      return COMMANDS.PDF_MERGE;
+    if (lower.startsWith(COMMANDS.PDF_MERGE_ALT))  return COMMANDS.PDF_MERGE;
     if (lower.includes(COMMANDS.GIF))              return COMMANDS.GIF;
     if (lower.includes(COMMANDS.GIF_SHORT))        return COMMANDS.GIF;
     if (lower.includes(COMMANDS.EVERYONE.toLowerCase()) || lower === "@todos") return COMMANDS.EVERYONE;

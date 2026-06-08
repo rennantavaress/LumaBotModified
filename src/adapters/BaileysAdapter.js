@@ -84,6 +84,7 @@ export class BaileysAdapter extends MessagingPort {
       msg?.extendedTextMessage?.text ||
       msg?.imageMessage?.caption ||
       msg?.videoMessage?.caption ||
+      msg?.documentMessage?.caption ||
       null
     );
   }
@@ -107,7 +108,8 @@ export class BaileysAdapter extends MessagingPort {
         msg?.imageMessage?.contextInfo ||
         msg?.videoMessage?.contextInfo ||
         msg?.stickerMessage?.contextInfo ||
-        msg?.audioMessage?.contextInfo;
+        msg?.audioMessage?.contextInfo ||
+        msg?.documentMessage?.contextInfo;
 
       if (!context?.participant) return false;
 
@@ -152,7 +154,8 @@ export class BaileysAdapter extends MessagingPort {
       msg?.imageMessage?.contextInfo ||
       msg?.videoMessage?.contextInfo ||
       msg?.stickerMessage?.contextInfo ||
-      msg?.audioMessage?.contextInfo;
+      msg?.audioMessage?.contextInfo ||
+      msg?.documentMessage?.contextInfo;
 
     return context?.quotedMessage;
   }
@@ -166,6 +169,7 @@ export class BaileysAdapter extends MessagingPort {
       q.extendedTextMessage?.text ||
       q.imageMessage?.caption ||
       q.videoMessage?.caption ||
+      q.documentMessage?.caption ||
       null
     );
   }
@@ -185,7 +189,8 @@ export class BaileysAdapter extends MessagingPort {
       msg?.imageMessage?.contextInfo ||
       msg?.videoMessage?.contextInfo ||
       msg?.stickerMessage?.contextInfo ||
-      msg?.audioMessage?.contextInfo;
+      msg?.audioMessage?.contextInfo ||
+      msg?.documentMessage?.contextInfo;
 
     const quotedJid = context?.participant;
     if (!quotedJid) return 'Alguém';
@@ -342,6 +347,24 @@ export class BaileysAdapter extends MessagingPort {
     return !!(msg?.stickerMessage);
   }
 
+  get hasPdf() {
+    return BaileysAdapter.isPdfMessage(this.innerMessage);
+  }
+
+  get quotedHasPdf() {
+    return BaileysAdapter.isPdfMessage(this.quotedMessage);
+  }
+
+  static isPdfMessage(msg) {
+    const unwrapped = BaileysAdapter.unwrapMessage(msg);
+    const doc = unwrapped?.documentMessage || msg?.documentMessage;
+    if (!doc) return false;
+
+    const mimeType = doc.mimetype?.toLowerCase() || "";
+    const fileName = doc.fileName?.toLowerCase() || "";
+    return mimeType === "application/pdf" || fileName.endsWith(".pdf");
+  }
+
   /**
    * Cria um adaptador para a mensagem citada (quoted), permitindo
    * acessar suas propriedades de mídia como se fosse uma mensagem normal.
@@ -355,7 +378,8 @@ export class BaileysAdapter extends MessagingPort {
       msg?.imageMessage?.contextInfo ||
       msg?.videoMessage?.contextInfo ||
       msg?.stickerMessage?.contextInfo ||
-      msg?.audioMessage?.contextInfo;
+      msg?.audioMessage?.contextInfo ||
+      msg?.documentMessage?.contextInfo;
 
     const fakeMsg = {
       key: {
