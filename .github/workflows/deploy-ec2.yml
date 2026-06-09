@@ -2,7 +2,7 @@ name: Deploy LumaBot to EC2
 
 on:
   push:
-    branches: [monteiro/luma-ec2]
+    branches: [monteiro/bulma-ec2]
     paths-ignore:
       - 'docs/**'
       - 'tests/**'
