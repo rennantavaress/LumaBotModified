@@ -104,7 +104,7 @@ function ensurePdfFileName(fileName) {
 }
 
 export class MediaProcessor {
-  static async processToSticker(message, sock, targetJid = null) {
+  static async processToSticker(message, sock, targetJid = null, options = {}) {
     if (message.message?.viewOnceMessage || message.message?.viewOnceMessageV2) {
       Logger.info("Mensagem de visualização única. Sticker não pode ser criado");
       return;
@@ -122,7 +122,7 @@ export class MediaProcessor {
       let stickerBuffer;
 
       if (type === "image") {
-        stickerBuffer = await ImageProcessor.toSticker(buffer);
+        stickerBuffer = await ImageProcessor.toSticker(buffer, { text: options.text });
       } else {
         stickerBuffer = await VideoConverter.toSticker(buffer, type === "gif");
       }

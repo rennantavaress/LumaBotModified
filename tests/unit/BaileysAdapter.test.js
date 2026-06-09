@@ -81,6 +81,20 @@ function createAudioMessage(jid = '5511988776655@s.whatsapp.net') {
   };
 }
 
+function createPdfMessage(caption = '', jid = '5511988776655@s.whatsapp.net') {
+  return {
+    key: { remoteJid: jid, fromMe: false, id: 'test_id_pdf' },
+    pushName: 'Teste',
+    message: {
+      documentMessage: {
+        caption,
+        mimetype: 'application/pdf',
+        fileName: 'arquivo.pdf',
+      },
+    },
+  };
+}
+
 /**
  * Cria uma mensagem de texto que cita (quoted) outra mensagem.
  */
@@ -213,6 +227,13 @@ describe('BaileysAdapter — body (leitura de texto)', () => {
 
     expect(adapter.body).toBeNull();
   });
+
+  it('le caption de documentMessage', () => {
+    const sock = createSocketMock();
+    const adapter = new BaileysAdapter(sock, createPdfMessage('legenda do pdf'));
+
+    expect(adapter.body).toBe('legenda do pdf');
+  });
 });
 
 describe('BaileysAdapter.unwrapMessage — desempacotamento de envelopes', () => {
@@ -309,6 +330,13 @@ describe('BaileysAdapter — detecção de mídia', () => {
     expect(adapter.hasAudio).toBe(false);
   });
 
+  it('hasPdf retorna true para documentMessage PDF', () => {
+    const sock = createSocketMock();
+    const adapter = new BaileysAdapter(sock, createPdfMessage());
+
+    expect(adapter.hasPdf).toBe(true);
+  });
+
   it('audioMimeType retorna fallback quando não há áudio', () => {
     const sock = createSocketMock();
     const adapter = new BaileysAdapter(sock, createTextMessage('oi'));
@@ -380,6 +408,32 @@ describe('BaileysAdapter — mensagem citada (quoted)', () => {
     const adapter = new BaileysAdapter(sock, createTextMessage('sem quoted'));
 
     expect(adapter.getQuotedAdapter()).toBeNull();
+  });
+
+  it('quotedHasPdf retorna true quando mensagem citada e PDF', () => {
+    const sock = createSocketMock();
+    const msg = {
+      key: { remoteJid: '120363000000000@g.us', fromMe: false, id: 'test_id_pdf_reply', participant: '5511@s.whatsapp.net' },
+      pushName: 'Teste',
+      message: {
+        extendedTextMessage: {
+          text: 'junta esse',
+          contextInfo: {
+            stanzaId: 'pdf_msg_id',
+            participant: '5511@s.whatsapp.net',
+            quotedMessage: {
+              documentMessage: {
+                mimetype: 'application/pdf',
+                fileName: 'a.pdf',
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const adapter = new BaileysAdapter(sock, msg);
+    expect(adapter.quotedHasPdf).toBe(true);
   });
 
   it('getQuotedAdapter retorna BaileysAdapter quando há quoted', () => {

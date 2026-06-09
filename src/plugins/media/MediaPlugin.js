@@ -1,16 +1,14 @@
 import { COMMANDS, MESSAGES } from "../../config/constants.js";
 import { MediaProcessor } from "../../handlers/MediaProcessor.js";
+import { PdfProcessor } from "../../processors/PdfProcessor.js";
 import { DatabaseService } from "../../services/Database.js";
 import { extractUrl } from "../../utils/MessageUtils.js";
 
 const DEFAULT_PDF_FILENAME = "imagem.pdf";
+const DEFAULT_MERGED_PDF_FILENAME = "pdf-juntado.pdf";
 
-function getPdfFileName(body) {
-  const rawName = body
-    ?.replace(new RegExp(`^\\s*${COMMANDS.PDF}\\s*`, "i"), "")
-    .trim();
-
-  if (!rawName) return DEFAULT_PDF_FILENAME;
+function toPdfFileName(rawName, fallback) {
+  if (!rawName?.trim()) return fallback;
 
   const slug = rawName
     .normalize("NFD")
@@ -20,7 +18,34 @@ function getPdfFileName(body) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 
-  return slug ? `${slug}.pdf` : DEFAULT_PDF_FILENAME;
+  return slug ? `${slug}.pdf` : fallback;
+}
+
+function getPdfFileName(body) {
+  const rawName = body
+    ?.replace(new RegExp(`^\\s*${COMMANDS.PDF}\\s*`, "i"), "")
+    .trim();
+
+  return toPdfFileName(rawName, DEFAULT_PDF_FILENAME);
+}
+
+function getPdfMergeAction(body) {
+  return body
+    ?.replace(new RegExp(`^\\s*(${COMMANDS.PDF_MERGE}|${COMMANDS.PDF_MERGE_ALT})\\s*`, "i"), "")
+    .trim() || "";
+}
+
+function getPdfMergeKey(bot) {
+  return bot.isGroup ? `${bot.jid}:${bot.senderJid}` : bot.jid;
+}
+
+function getStickerText(body) {
+  const rawText = body
+    ?.replace(/^\s*!(sticker|s)\s*/i, "")
+    .trim();
+
+  if (!rawText || /^https?:\/\//i.test(rawText)) return null;
+  return rawText.replace(/\s+/g, " ").slice(0, 90);
 }
 
 /**
@@ -28,12 +53,16 @@ function getPdfFileName(body) {
  * Comandos: !fig (!f), !image (!i), !gif (!g)
  */
 export class MediaPlugin {
+  static #pdfMergeQueues = new Map();
+
   static commands = [
     COMMANDS.STICKER,
     COMMANDS.STICKER_SHORT,
     COMMANDS.IMAGE,
     COMMANDS.IMAGE_SHORT,
     COMMANDS.PDF,
+    COMMANDS.PDF_MERGE,
+    COMMANDS.PDF_MERGE_ALT,
     COMMANDS.GIF,
     COMMANDS.GIF_SHORT,
   ];
@@ -48,6 +77,9 @@ export class MediaPlugin {
         return this.#handleImage(bot);
       case COMMANDS.PDF:
         return this.#handlePdf(bot);
+      case COMMANDS.PDF_MERGE:
+      case COMMANDS.PDF_MERGE_ALT:
+        return this.#handlePdfMerge(bot);
       case COMMANDS.GIF:
       case COMMANDS.GIF_SHORT:
         return this.#handleGif(bot);
@@ -57,6 +89,8 @@ export class MediaPlugin {
   async #handleSticker(bot) {
     await bot.react("⏳");
     const url = extractUrl(bot.body);
+    const text = getStickerText(bot.body);
+
     if (url) {
       await MediaProcessor.processUrlToSticker(url, bot.socket, bot.raw);
       MediaPlugin.#incrementMedia("stickers_created");
@@ -64,14 +98,14 @@ export class MediaPlugin {
       return;
     }
     if (bot.hasMedia) {
-      await MediaProcessor.processToSticker(bot.raw, bot.socket);
+      await MediaProcessor.processToSticker(bot.raw, bot.socket, null, { text });
       MediaPlugin.#incrementMedia("stickers_created");
       await bot.react("✅");
       return;
     }
     const quoted = bot.getQuotedAdapter();
     if (quoted?.hasVisualContent) {
-      await MediaProcessor.processToSticker(quoted.raw, bot.socket, bot.jid);
+      await MediaProcessor.processToSticker(quoted.raw, bot.socket, bot.jid, { text });
       MediaPlugin.#incrementMedia("stickers_created");
       await bot.react("✅");
     } else {
@@ -117,6 +151,70 @@ export class MediaPlugin {
     } else {
       await bot.react("❌");
       await bot.reply(MESSAGES.REPLY_IMAGE_PDF);
+    }
+  }
+
+  async #handlePdfMerge(bot) {
+    const key = getPdfMergeKey(bot);
+    const action = getPdfMergeAction(bot.body);
+    const lowerAction = action.toLowerCase();
+
+    if (lowerAction.startsWith("limpar") || lowerAction.startsWith("cancelar")) {
+      MediaPlugin.#pdfMergeQueues.delete(key);
+      await bot.reply(MESSAGES.PDF_MERGE_CLEARED);
+      return;
+    }
+
+    if (lowerAction.startsWith("pronto") || lowerAction.startsWith("finalizar")) {
+      return this.#finishPdfMerge(bot, key, action.replace(/^(pronto|finalizar)\s*/i, ""));
+    }
+
+    const source = bot.hasPdf ? bot : bot.quotedHasPdf ? bot.getQuotedAdapter() : null;
+    if (!source?.hasPdf) {
+      await bot.reply(MESSAGES.PDF_MERGE_USAGE);
+      return;
+    }
+
+    await bot.react("⏳");
+    const buffer = await MediaProcessor.downloadMedia(source.raw, bot.socket);
+    if (!buffer) {
+      await bot.react("❌");
+      await bot.reply(MESSAGES.DOWNLOAD_ERROR);
+      return;
+    }
+
+    const queue = MediaPlugin.#pdfMergeQueues.get(key) || [];
+    queue.push(buffer);
+    MediaPlugin.#pdfMergeQueues.set(key, queue);
+
+    await bot.react("✅");
+    await bot.reply(`${MESSAGES.PDF_MERGE_ADDED} (${queue.length}).`);
+  }
+
+  async #finishPdfMerge(bot, key, rawFileName) {
+    const queue = MediaPlugin.#pdfMergeQueues.get(key) || [];
+    if (queue.length < 2) {
+      await bot.reply(MESSAGES.PDF_MERGE_NEED_MORE);
+      return;
+    }
+
+    try {
+      await bot.react("⏳");
+      const merged = await PdfProcessor.merge(queue);
+      const fileName = toPdfFileName(rawFileName, DEFAULT_MERGED_PDF_FILENAME);
+
+      await bot.sendMessage(bot.jid, {
+        document: merged,
+        mimetype: "application/pdf",
+        fileName,
+      });
+
+      MediaPlugin.#pdfMergeQueues.delete(key);
+      MediaPlugin.#incrementMedia("pdfs_merged");
+      await bot.react("✅");
+    } catch (error) {
+      await bot.react("❌");
+      await bot.reply(MESSAGES.PDF_MERGE_ERROR);
     }
   }
 

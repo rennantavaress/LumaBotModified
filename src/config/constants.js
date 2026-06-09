@@ -26,8 +26,8 @@ export const CONFIG = ConfigStore.apply("CONFIG", {
 });
 
 export const STICKER_METADATA = ConfigStore.apply("STICKER_METADATA", {
-  PACK_NAME: "BulmaBot  Stickers",
-  AUTHOR: "Criado com ❤️ por BulmaBot",
+  PACK_NAME: "LumaBot  Stickers",
+  AUTHOR: "Criado com ❤️ por LumaBot",
 });
 
 export const COMMANDS = ConfigStore.apply("COMMANDS", {
@@ -36,6 +36,8 @@ export const COMMANDS = ConfigStore.apply("COMMANDS", {
   IMAGE: "!image",
   IMAGE_SHORT: "!i",
   PDF: "!pdf",
+  PDF_MERGE: "!juntarpdf",
+  PDF_MERGE_ALT: "!mergepdf",
   GIF: "!gif",
   GIF_SHORT: "!g",
   HELP: "!ajuda",
@@ -63,10 +65,11 @@ export const MENUS = ConfigStore.apply("MENUS", {
   HELP_TEXT:
     "🤖 *LISTA DE COMANDOS* 🤖\n\n" +
     "🎨 *MÍDIA*\n" +
-    "• *!fig* (!f) - Imagem/Vídeo/Link -> Sticker\n" +
+    "• *!sticker* (!s) - Imagem/Vídeo/Link -> Sticker; use !sticker texto para adicionar legenda\n" +
     "• *!gif* (!g) - Sticker Animado -> GIF\n" +
     "• *!image* (!i) - Sticker -> Imagem\n" +
-    "• *!pdf* - Imagem -> PDF\n\n" +
+    "• *!pdf* - Imagem -> PDF\n" +
+    "• *!juntarpdf* - Adiciona PDFs; finalize com !juntarpdf pronto nome\n\n" +
     "🧠 *INTELIGÊNCIA ARTIFICIAL*\n" +
     "• *Bulma* - Fale qualquer coisa (ex: 'Bulma, bom dia')\n" +
     "• *!alma* - Abre o menu para mudar a Bulma\n" +
@@ -102,7 +105,12 @@ export const MENUS = ConfigStore.apply("MENUS", {
 
 
 export const MESSAGES = ConfigStore.apply("MESSAGES", {
-
+  REPLY_IMAGE_PDF: "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf nome do arquivo",
+  PDF_MERGE_USAGE: "ℹ️ Envie/responda PDFs com !juntarpdf para adicionar. Finalize com !juntarpdf pronto nome do arquivo. Use !juntarpdf limpar para cancelar.",
+  PDF_MERGE_NEED_MORE: "ℹ️ Adicione pelo menos 2 PDFs antes de finalizar.",
+  PDF_MERGE_ADDED: "📎 PDF adicionado",
+  PDF_MERGE_CLEARED: "🗑️ Lista de PDFs limpa.",
+  PDF_MERGE_ERROR: "❌ Não consegui juntar esses PDFs.",
   INITIALIZING: "🤖 BulmaBot - Assistente WhatsApp",
   STICKER_COMMAND: "🔄 !fig - Converte imagem/vídeo para sticker",
   IMAGE_COMMAND: "🖼️ !image - Converte sticker para imagem",
