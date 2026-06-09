@@ -175,7 +175,7 @@ describe('extractUrl — extração de URLs', () => {
   });
 
   it('extrai URL do Instagram corretamente', () => {
-    expect(extractUrl('!d https://instagram.com/reel/abc123/')).toBe('https://instagram.com/reel/abc123/');
+    expect(extractUrl('!bx https://instagram.com/reel/abc123/')).toBe('https://instagram.com/reel/abc123/');
   });
 });
 

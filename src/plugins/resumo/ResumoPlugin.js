@@ -79,7 +79,7 @@ export class ResumoPlugin {
 
   /** @private */
   _parseLimit(body) {
-    const match = body?.match(/!resumo\s+(\d+)/i);
+    const match = body?.match(new RegExp(`${COMMANDS.RESUMO}\\s+(\\d+)`, 'i'));
     if (!match) return DEFAULT_LIMIT;
     return Math.min(Math.max(parseInt(match[1], 10), 1), MAX_LIMIT);
   }
