@@ -79,7 +79,7 @@ jobs:
               "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin",
               "docker compose pull",
               "docker compose up -d --remove-orphans",
-              "for i in 1 2 3; do sleep 5; docker exec luma-nginx nginx -s reload 2>&1 && break; done",
+              "sleep 10",
               "curl -sf http://localhost:3000/health && echo \"\\n✅ Health check passed\" || echo \"\\n⚠️ Health check failed\""
             ]}' \
             --comment "Deploy LumaBot ${{ github.sha }}" \

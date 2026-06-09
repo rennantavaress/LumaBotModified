@@ -8,7 +8,7 @@ import fs from "fs";
 
 /**
  * Plugin de download de vídeo: baixa vídeos de redes sociais (Twitter/X, Instagram).
- * Comandos: !download (!d)
+ * Comandos: !baixar (!bx)
  */
 export class DownloadPlugin {
   static commands = [COMMANDS.DOWNLOAD, COMMANDS.DOWNLOAD_SHORT];
