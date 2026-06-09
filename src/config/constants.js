@@ -16,7 +16,8 @@ export const CONFIG = ConfigStore.apply("CONFIG", {
   MAX_FILE_SIZE: 800,
   VIDEO_DOWNLOAD_MAX_SIZE_MB: 100,
   VIDEO_DOWNLOAD_TIMEOUT_MS: 240000,
-  VIDEO_DOWNLOAD_FORMAT: "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best/best",
+  VIDEO_DOWNLOAD_FORMAT:
+    "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best/best",
   AUDIO_DOWNLOAD_FORMAT: "bestaudio/best",
   WEBP_QUALITY: 75,
   MAX_GIF_FRAMES: 50,
@@ -36,6 +37,8 @@ export const COMMANDS = ConfigStore.apply("COMMANDS", {
   IMAGE: "!image",
   IMAGE_SHORT: "!i",
   PDF: "!pdf",
+  PDF_MERGE: "!mergepdf",
+  PDF_MERGE_ALT: "!joinpdf",
   GIF: "!gif",
   GIF_SHORT: "!g",
   HELP: "!help",
@@ -66,7 +69,8 @@ export const MENUS = ConfigStore.apply("MENUS", {
     "• *!sticker* (!s) - Imagem/Vídeo/Link -> Sticker\n" +
     "• *!gif* (!g) - Sticker Animado -> GIF\n" +
     "• *!image* (!i) - Sticker -> Imagem\n" +
-    "• *!pdf* - Imagem -> PDF\n\n" +
+    "• *!pdf* - Imagem -> PDF\n" +
+    "• *!mergepdf* - Adiciona PDFs; finalize com !mergepdf done nome\n\n" +
     "🧠 *INTELIGÊNCIA ARTIFICIAL*\n" +
     "• *Luma* - Fale qualquer coisa (ex: 'Luma, bom dia')\n" +
     "• *!persona* - Abre o menu para mudar a Luma\n" +
@@ -100,9 +104,7 @@ export const MENUS = ConfigStore.apply("MENUS", {
   },
 });
 
-
 export const MESSAGES = ConfigStore.apply("MESSAGES", {
-
   INITIALIZING: "🤖 WhatsApp Sticker Bot - Conversor Completo",
   STICKER_COMMAND: "🔄 !sticker - Converte imagem/vídeo para sticker",
   IMAGE_COMMAND: "🖼️ !image - Converte sticker para imagem",
@@ -133,7 +135,16 @@ export const MESSAGES = ConfigStore.apply("MESSAGES", {
   VIDEO_NO_URL: "ℹ️ Cole o link do vídeo junto com o comando.\nEx: `!download https://x.com/...`",
   AUDIO_NO_URL: "ℹ️ Cole o link junto com o comando.\nEx: `!audio https://youtu.be/...`",
   AUDIO_SENT: "🎵 Pronto!",
-  AUDIO_DOWNLOAD_ERROR: "❌ Não consegui baixar o áudio. O conteúdo pode ser privado ou a URL inválida.",
-  YTDLP_NOT_FOUND: "❌ Não foi possível baixar o yt-dlp. Verifique sua conexão e tente novamente.",
-  REPLY_IMAGE_PDF: "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf nome do arquivo",
+  AUDIO_DOWNLOAD_ERROR:
+    "❌ Não consegui baixar o áudio. O conteúdo pode ser privado ou a URL inválida.",
+  YTDLP_NOT_FOUND:
+    "❌ Não foi possível baixar o yt-dlp. Verifique sua conexão e tente novamente.",
+  REPLY_IMAGE_PDF:
+    "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf nome do arquivo",
+  PDF_MERGE_USAGE:
+    "ℹ️ Envie/responda PDFs com !mergepdf para adicionar. Finalize com !mergepdf done nome do arquivo. Use !mergepdf clear para cancelar.",
+  PDF_MERGE_NEED_MORE: "ℹ️ Adicione pelo menos 2 PDFs antes de finalizar.",
+  PDF_MERGE_ADDED: "📎 PDF adicionado",
+  PDF_MERGE_CLEARED: "🗑️ Lista de PDFs limpa.",
+  PDF_MERGE_ERROR: "❌ Não consegui juntar esses PDFs.",
 });

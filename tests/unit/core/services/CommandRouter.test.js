@@ -12,6 +12,8 @@ describe('CommandRouter.detect — comandos', () => {
     ['!image',        '!image'],
     ['!i',            '!image'],
     ['!pdf',          '!pdf'],
+    ['!mergepdf',     '!mergepdf'],
+    ['!joinpdf',      '!mergepdf'],
     ['!gif',          '!gif'],
     ['!g',            '!gif'],
     ['!help',         '!help'],
