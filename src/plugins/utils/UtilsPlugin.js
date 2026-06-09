@@ -2,7 +2,7 @@ import { COMMANDS, MENUS } from "../../config/constants.js";
 
 /**
  * Plugin de utilitários: help e informações do usuário.
- * Comandos: !ajuda, !meuid
+ * Comandos: !help, !meunumero
  */
 export class UtilsPlugin {
   static commands = [COMMANDS.HELP, COMMANDS.MY_NUMBER];

@@ -131,12 +131,9 @@ export const MESSAGES = ConfigStore.apply("MESSAGES", {
   VIDEO_DOWNLOADING: "⏳ Baixando vídeo...",
   VIDEO_SENT: "🎬 Pronto!",
   VIDEO_TOO_LARGE: "❌ Vídeo muito grande para enviar (máx. ~50MB).",
-  VIDEO_DOWNLOAD_ERROR:
-    "❌ Não consegui baixar esse vídeo. O conteúdo pode ser privado ou a URL inválida.",
-  VIDEO_NO_URL:
-    "ℹ️ Cole o link do vídeo junto com o comando.\nEx: `!download https://x.com/...`",
-  AUDIO_NO_URL:
-    "ℹ️ Cole o link junto com o comando.\nEx: `!audio https://youtu.be/...`",
+  VIDEO_DOWNLOAD_ERROR: "❌ Não consegui baixar esse vídeo. O conteúdo pode ser privado ou a URL inválida.",
+  VIDEO_NO_URL: "ℹ️ Cole o link do vídeo junto com o comando.\nEx: `!download https://x.com/...`",
+  AUDIO_NO_URL: "ℹ️ Cole o link junto com o comando.\nEx: `!audio https://youtu.be/...`",
   AUDIO_SENT: "🎵 Pronto!",
   AUDIO_DOWNLOAD_ERROR:
     "❌ Não consegui baixar o áudio. O conteúdo pode ser privado ou a URL inválida.",

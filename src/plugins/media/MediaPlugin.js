@@ -50,7 +50,7 @@ function getStickerText(body) {
 
 /**
  * Plugin de mídia: converte imagens/vídeos em stickers, stickers em imagens/GIFs.
- * Comandos: !fig (!f), !image (!i), !gif (!g)
+ * Comandos: !sticker (!s), !image (!i), !gif (!g)
  */
 export class MediaPlugin {
   static #pdfMergeQueues = new Map();
