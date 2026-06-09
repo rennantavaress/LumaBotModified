@@ -2,6 +2,25 @@ import { Logger } from '../utils/Logger.js';
 import { BaileysAdapter } from '../adapters/BaileysAdapter.js';
 import { MessageHandler } from '../handlers/MessageHandler.js';
 import { JidQueue } from './JidQueue.js';
+import { UserResolver } from '../core/services/UserResolver.js';
+
+/**
+ * Enriquece os perfis de usuário a partir da mensagem recebida: o remetente
+ * (com pushName) e cada JID mencionado (registro básico). Nunca lança — falha
+ * de persistência não pode bloquear o processamento da mensagem.
+ */
+async function trackUsers(botAdapter) {
+  try {
+    if (botAdapter.isFromMe) return;
+    UserResolver.upsertFromMessage(botAdapter.senderJid, {
+      pushName: botAdapter.message?.pushName,
+    });
+    const mentioned = await botAdapter.getMentionedJids();
+    for (const jid of mentioned) UserResolver.register(jid);
+  } catch (error) {
+    Logger.error('Erro ao registrar usuários da mensagem:', error);
+  }
+}
 
 /**
  * Fila global por JID: mensagens do mesmo chat são serializadas,
@@ -95,6 +114,7 @@ export async function routeMessages(sock, m) {
       }
 
       sanitizeInput(botAdapter);
+      await trackUsers(botAdapter);
 
       pending.push(
         queue.enqueue(botAdapter.jid, () => MessageHandler.process(botAdapter)),

@@ -7,7 +7,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  * roteamento correto entre Tavily e Google Grounding.
  *
  * Todas as chamadas HTTP são mockadas via vi.stubGlobal('fetch').
+ *
+ * O módulo env.js é mockado porque o WebSearchService lê env.TAVILY_API_KEY,
+ * que é congelado no import — definir process.env em runtime não teria efeito.
  */
+vi.mock('../../src/config/env.js', () => ({
+  env: { TAVILY_API_KEY: 'fake_tavily_key_para_testes' },
+}));
 
 import { WebSearchService } from '../../src/services/WebSearchService.js';
 

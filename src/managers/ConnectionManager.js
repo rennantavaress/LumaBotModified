@@ -7,6 +7,8 @@ import { prepareBaileysSession, createBaileysSocket } from '../infra/BaileysSock
 import { presentQrCode } from '../infra/QrCodePresenter.js';
 import { routeMessages } from '../infra/MessageRouter.js';
 import { ReconnectionPolicy } from '../infra/ReconnectionPolicy.js';
+import { UserResolver } from '../core/services/UserResolver.js';
+import { ReminderScheduler } from '../infra/ReminderScheduler.js';
 
 /**
  * Coordenador do ciclo de vida do socket WhatsApp.
@@ -17,6 +19,7 @@ export class ConnectionManager {
     this.sock         = null;
     this.isConnecting = false;
     this.policy       = new ReconnectionPolicy(CONFIG);
+    this.reminderScheduler = new ReminderScheduler();
   }
 
   async initialize() {
@@ -55,6 +58,17 @@ export class ConnectionManager {
     this.sock.ev.on('connection.update', update => this.handleConnectionUpdate(update));
     this.sock.ev.on('creds.update', saveCreds);
     this.sock.ev.on('messages.upsert', m => routeMessages(this.sock, m));
+    // Eventos de contato enriquecem os perfis de usuário (nome, número, LID).
+    this.sock.ev.on('contacts.upsert', contacts => this.handleContacts(contacts));
+    this.sock.ev.on('contacts.update', contacts => this.handleContacts(contacts));
+  }
+
+  /** Persiste/atualiza perfis a partir de eventos de contato do Baileys. */
+  handleContacts(contacts) {
+    if (!Array.isArray(contacts)) return;
+    for (const contact of contacts) {
+      UserResolver.upsertFromContact(contact);
+    }
   }
 
   async handleConnectionUpdate(update) {
@@ -80,6 +94,7 @@ export class ConnectionManager {
         Logger.info(MESSAGES.CONNECTED);
         this.isConnecting = false;
         this.policy.resetAttempts();
+        this.reminderScheduler.start(this.sock);
       }
     } catch (error) {
       Logger.error('Erro no handler de conexão:', error);
@@ -188,6 +203,7 @@ export class ConnectionManager {
 
   gracefulShutdown() {
     Logger.info('\n🛑 Finalizando...');
+    this.reminderScheduler.stop();
     this.closeSafely();
     try { FileSystem.cleanupDir(CONFIG.TEMP_DIR); } catch {}
     Logger.info('✅ Finalizado');

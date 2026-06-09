@@ -1,4 +1,6 @@
-export const CONFIG = {
+import { ConfigStore } from "./ConfigStore.js";
+
+export const CONFIG = ConfigStore.apply("CONFIG", {
   TEMP_DIR: "./temp",
   AUTH_DIR: "./auth_info",
 
@@ -21,14 +23,14 @@ export const CONFIG = {
   TIMEOUT_MS: 60000,
   KEEPALIVE_MS: 30000,
   IGNORE_SELF: true,
-};
+});
 
-export const STICKER_METADATA = {
+export const STICKER_METADATA = ConfigStore.apply("STICKER_METADATA", {
   PACK_NAME: "LumaBot  Stickers",
   AUTHOR: "Criado com ❤️ por LumaBot",
-}
+});
 
-export const COMMANDS = {
+export const COMMANDS = ConfigStore.apply("COMMANDS", {
   STICKER: "!sticker",
   STICKER_SHORT: "!s",
   IMAGE: "!image",
@@ -52,9 +54,14 @@ export const COMMANDS = {
   LUMA_CLEAR_ALT: "!clear",
   MY_NUMBER: "!meunumero",
   RESUMO: "!resumo",
-};
+  NICK: "!nick",
+  NICK_ALT: "!n",
+  RANK: "!rank",
+  REMINDER: "!lembrete",
+  REMINDER_SHORT: "!lembrar",
+});
 
-export const MENUS = {
+export const MENUS = ConfigStore.apply("MENUS", {
   HELP_TEXT:
     "🤖 *LISTA DE COMANDOS* 🤖\n\n" +
     "🎨 *MÍDIA*\n" +
@@ -68,6 +75,12 @@ export const MENUS = {
     "• *!persona* - Abre o menu para mudar a Luma\n" +
     "• *!luma clear* (!lc ou !clear) - Limpa memória da conversa\n" +
     "• *!luma stats* (!ls) - Mostra estatísticas da Luma\n\n" +
+    "🏆 *SOCIAL*\n" +
+    "• *!rank* - Ranking de quem mais interage com a Luma no grupo\n" +
+    "• *!rank global* - Ranking geral (todos os chats)\n" +
+    "• *!nick SeuNome* - Define como você aparece nos rankings\n" +
+    "• *!nick @pessoa Nome* - Define o apelido de alguém\n" +
+    "• *!lembrete* (ou peça à Luma) - Agenda um lembrete com menção\n\n" +
     "🛠️ *UTILITÁRIOS*\n" +
     "• *!download* (!d) - Baixa vídeo do Twitter/X ou Instagram\n" +
     "• *!audio* (!a) - Baixa somente o áudio (MP3) de qualquer link\n" +
@@ -88,8 +101,12 @@ export const MENUS = {
     INVALID_OPT: "❌ Opção inválida. Tente p1, p2, etc.",
     PERSONA_CHANGED: "✅ Personalidade alterada para: ",
   },
-};
+});
 
+
+export const MESSAGES = ConfigStore.apply("MESSAGES", {
+
+<<<<<<< HEAD
 export const MESSAGES = {
   REPLY_IMAGE_PDF: "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf nome do arquivo",
   PDF_MERGE_USAGE: "ℹ️ Envie/responda PDFs com !juntarpdf para adicionar. Finalize com !juntarpdf pronto nome do arquivo. Use !juntarpdf limpar para cancelar.",
@@ -97,6 +114,8 @@ export const MESSAGES = {
   PDF_MERGE_ADDED: "📎 PDF adicionado",
   PDF_MERGE_CLEARED: "🗑️ Lista de PDFs limpa.",
   PDF_MERGE_ERROR: "❌ Não consegui juntar esses PDFs.",
+=======
+>>>>>>> b0b17d4cc4e41b43e7364c1470af7d9a806b8b08
   INITIALIZING: "🤖 WhatsApp Sticker Bot - Conversor Completo",
   STICKER_COMMAND: "🔄 !sticker - Converte imagem/vídeo para sticker",
   IMAGE_COMMAND: "🖼️ !image - Converte sticker para imagem",
@@ -129,4 +148,5 @@ export const MESSAGES = {
   AUDIO_SENT: "🎵 Pronto!",
   AUDIO_DOWNLOAD_ERROR: "❌ Não consegui baixar o áudio. O conteúdo pode ser privado ou a URL inválida.",
   YTDLP_NOT_FOUND: "❌ Não foi possível baixar o yt-dlp. Verifique sua conexão e tente novamente.",
-};
+  REPLY_IMAGE_PDF: "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf nome do arquivo",
+});

@@ -1,0 +1,137 @@
+import fs from "fs";
+import path from "path";
+import { ConfigStore } from "./ConfigStore.js";
+import { CONFIG_SCHEMA, EDITABLE_ENV_KEYS, SECRET_KEYS, flattenSchemaFields } from "./configSchema.js";
+import { CONFIG, MENUS, MESSAGES } from "./constants.js";
+import { LUMA_CONFIG } from "./lumaConfig.js";
+
+/**
+ * Serviço de configuração consumido pelo dashboard.
+ *
+ * Lê os valores atuais (env + overrides mesclados) e grava alterações:
+ * env vai para o .env (e atualiza process.env para o próximo spawn do bot),
+ * config vai para o ConfigStore (override JSON). As mudanças entram em vigor
+ * no restart do bot.
+ */
+
+const ENV_PATH = path.resolve("./.env");
+
+const SECTIONS = { CONFIG, LUMA_CONFIG, MENUS, MESSAGES };
+
+function getByPath(obj, dottedPath) {
+  return dottedPath.split(".").reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
+}
+
+function maskSecret(value) {
+  if (!value) return "";
+  const str = String(value);
+  if (str.length <= 4) return "••••";
+  return `••••${str.slice(-4)}`;
+}
+
+/** Valor atual de um campo do schema (secrets mascarados). */
+function readFieldValue(field) {
+  if (field.source === "env") {
+    const raw = process.env[field.key];
+    if (field.type === "secret") return raw ? maskSecret(raw) : "";
+    if (field.type === "boolean") return raw === "true";
+    if (field.type === "number") return raw != null && raw !== "" ? Number(raw) : "";
+    return raw ?? "";
+  }
+  const section = SECTIONS[field.section];
+  const value = section ? getByPath(section, field.key) : undefined;
+  if (field.type === "secret") return value ? maskSecret(value) : "";
+  return value ?? (field.type === "boolean" ? false : "");
+}
+
+/** Retorna o schema com os valores atuais preenchidos em cada campo. */
+export function readConfig() {
+  const groups = CONFIG_SCHEMA.groups.map((group) => ({
+    ...group,
+    fields: group.fields.map((field) => ({ ...field, value: readFieldValue(field) })),
+  }));
+  return { groups };
+}
+
+/** Atualiza chaves no arquivo .env preservando o resto e o process.env atual. */
+function updateEnvFile(updates) {
+  let content = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, "utf-8") : "";
+  const lines = content.split("\n");
+
+  for (const [key, value] of Object.entries(updates)) {
+    const strValue = value == null ? "" : String(value);
+    const idx = lines.findIndex((l) => l.match(new RegExp(`^\\s*${key}\\s*=`)));
+    const line = `${key}=${strValue}`;
+    if (idx >= 0) lines[idx] = line;
+    else lines.push(line);
+    // Atualiza o ambiente do dashboard para o próximo spawn do bot herdar o novo valor.
+    process.env[key] = strValue;
+  }
+
+  fs.writeFileSync(ENV_PATH, lines.join("\n"), "utf-8");
+}
+
+/** Constrói o objeto aninhado {section: {a: {b: value}}} a partir de um path. */
+function nestPath(section, dottedPath, value) {
+  const keys = dottedPath.split(".");
+  const root = {};
+  let cursor = root;
+  keys.forEach((key, i) => {
+    cursor[key] = i === keys.length - 1 ? value : {};
+    cursor = cursor[key];
+  });
+  return { [section]: root };
+}
+
+/**
+ * Aplica alterações de configuração.
+ * @param {Array<{key:string, source:string, section?:string, value:any}>} changes
+ */
+export function writeConfig(changes) {
+  if (!Array.isArray(changes)) throw new Error("changes deve ser um array");
+
+  const fieldsByKey = new Map(flattenSchemaFields().map((f) => [`${f.source}:${f.section ?? "env"}:${f.key}`, f]));
+
+  const envUpdates = {};
+  let configOverride = {};
+
+  for (const change of changes) {
+    const id = `${change.source}:${change.section ?? "env"}:${change.key}`;
+    const field = fieldsByKey.get(id);
+    if (!field) continue; // ignora chaves fora do schema (whitelist)
+
+    if (field.source === "env") {
+      if (!EDITABLE_ENV_KEYS.has(field.key)) continue;
+      // Secret mascarado não foi alterado → não sobrescreve com a máscara.
+      if (field.type === "secret" && String(change.value).startsWith("••••")) continue;
+      let value = change.value;
+      if (field.type === "boolean") value = value ? "true" : "false";
+      envUpdates[field.key] = value;
+    } else {
+      if (field.type === "secret" && String(change.value).startsWith("••••")) continue;
+      configOverride = deepMergeLocal(configOverride, nestPath(field.section, field.key, change.value));
+    }
+  }
+
+  if (Object.keys(envUpdates).length > 0) updateEnvFile(envUpdates);
+  if (Object.keys(configOverride).length > 0) ConfigStore.save(configOverride);
+
+  return { ok: true };
+}
+
+function isPlainObject(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+function deepMergeLocal(base, override) {
+  if (!isPlainObject(override)) return override;
+  const out = isPlainObject(base) ? { ...base } : {};
+  for (const key of Object.keys(override)) {
+    out[key] =
+      isPlainObject(base?.[key]) && isPlainObject(override[key])
+        ? deepMergeLocal(base[key], override[key])
+        : override[key];
+  }
+  return out;
+}
+
+export { SECRET_KEYS };

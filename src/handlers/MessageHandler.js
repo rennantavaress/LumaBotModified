@@ -11,9 +11,12 @@ import { DownloadPlugin } from "../plugins/download/DownloadPlugin.js";
 import { AudioDownloadPlugin } from "../plugins/download/AudioDownloadPlugin.js";
 import { GroupToolsPlugin } from "../plugins/group-tools/GroupToolsPlugin.js";
 import { LumaPlugin } from "../plugins/luma/LumaPlugin.js";
+import { RankPlugin } from "../plugins/luma/RankPlugin.js";
 import { SpontaneousPlugin } from "../plugins/spontaneous/SpontaneousPlugin.js";
 import { UtilsPlugin } from "../plugins/utils/UtilsPlugin.js";
 import { ResumoPlugin } from "../plugins/resumo/ResumoPlugin.js";
+import { UserPlugin } from "../plugins/user/UserPlugin.js";
+import { ReminderPlugin } from "../plugins/reminder/ReminderPlugin.js";
 
 /** Instancia o AudioTranscriber com o melhor provider disponível. */
 function buildAudioTranscriber() {
@@ -41,7 +44,10 @@ function buildPluginManager() {
     .register(new LumaPlugin({ lumaHandler, audioTranscriber }))
     .register(new SpontaneousPlugin({ lumaHandler }))
     .register(new UtilsPlugin())
-    .register(new ResumoPlugin({ lumaHandler }));
+    .register(new ResumoPlugin({ lumaHandler }))
+    .register(new UserPlugin())
+    .register(new RankPlugin())
+    .register(new ReminderPlugin());
 }
 
 /**

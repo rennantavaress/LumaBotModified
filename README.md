@@ -15,9 +15,16 @@ Assistente de IA para WhatsApp com personalidade humana, arquitetura hexagonal, 
 
 ## 📌 Visão Geral
 
-LumaBot é um bot de WhatsApp com uma assistente virtual chamada **Luma** — uma IA com personalidade que se passa por uma pessoa humana no chat. O sistema responde mensagens, analisa imagens, transcreve áudios, busca na internet, processa mídia e interage espontaneamente em grupos.
+LumaBot é um bot de WhatsApp com uma assistente virtual chamada **Luma** — uma IA com personalidade que se passa por uma pessoa humana no chat. O sistema responde mensagens, analisa imagens, transcreve áudios, busca na internet, processa mídia, agenda lembretes, mantém ranking de interações e interage espontaneamente em grupos.
 
-O projeto foi construído com foco em **manutenibilidade e extensibilidade**: adicionar uma nova feature significa criar um plugin isolado, sem tocar no core do sistema. Trocar o provider de IA é uma variável de ambiente.
+O projeto foi construído com foco em **manutenibilidade e extensibilidade**: adicionar uma nova feature significa criar um plugin isolado, sem tocar no core do sistema. Trocar o provider de IA é uma variável de ambiente. Acompanha um **dashboard web** (Vite + React + TypeScript) que controla o bot e configura **tudo** que vive em `src/config` sem editar código.
+
+**Destaques desta versão (7.0):**
+- 👤 **UserResolver** — resolve JID → nome humano de forma robusta (`@lid` inclusive), com apelidos manuais
+- 🏆 **Ranking** de quem mais interage com a Luma (global e por grupo)
+- ⏰ **Lembretes** por comando ou linguagem natural ("Luma, me lembre… terça às 16h"), com menção a uma ou várias pessoas — sobrevivem a reinícios
+- 🎛 **Dashboard novo** em React, mobile-first, que edita toda a configuração em runtime
+- 🚀 **Auto-deploy** que aplica backend e painel em todo push na `main`
 
 ---
 
@@ -65,9 +72,12 @@ Para detalhes completos: [`docs/01-Arquitetura.md`](./docs/01-Arquitetura.md)
 | **Sharp** | 0.32+ | Processamento de imagem (stickers WebP 512×512) |
 | **FFmpeg** | qualquer | Processamento de vídeo e stickers animados |
 | **yt-dlp** | — | Download de vídeos de redes sociais |
-| **better-sqlite3** | 12+ | SQLite síncrono para métricas e personalidades |
+| **better-sqlite3** | 12+ | SQLite síncrono para métricas, personalidades, usuários, ranking e lembretes |
 | **pino** | 10+ | Logger estruturado de alta performance |
-| **Vitest** | 4.x | Suite de testes unitários (510+ testes) |
+| **Vitest** | 4.x | Suite de testes unitários (556 testes) |
+| **Vite + React + TS** | 5.x / 18.x | Dashboard web (SPA) |
+| **Tailwind CSS** | 3.x | Estilização do dashboard (tema Thera) |
+| **PM2** | opcional | Supervisão em produção (autorestart + boot) |
 
 ---
 
@@ -76,54 +86,70 @@ Para detalhes completos: [`docs/01-Arquitetura.md`](./docs/01-Arquitetura.md)
 ```bash
 LumaBot/
 ├── index.js                    # Entry point do bot
+├── ecosystem.config.cjs        # Config PM2 (produção)
 ├── dashboard/
-│   └── server.js               # Dashboard web (Express + WebSocket)
+│   ├── server.js               # Backend do dashboard (Express + WebSocket + API REST)
+│   ├── launch.js               # Supervisor mínimo (reinicia o server no deploy/crash)
+│   └── web/                    # App React (Vite + TS + Tailwind) — buildado em web/dist
+│       └── src/
+│           ├── components/     # AppShell + primitivos de UI
+│           ├── pages/          # Overview, Logs, Config, Social, Reminders, Login
+│           └── lib/            # api, useLive (WebSocket), tipos, utils
 ├── src/
 │   ├── core/
 │   │   ├── ports/              # Contratos abstratos (AIPort, StoragePort...)
 │   │   └── services/           # Lógica de domínio pura
+│   │       ├── UserResolver.js     # JID → melhor nome humano
+│   │       ├── ReminderService.js  # Validação e persistência de lembretes
+│   │       └── ...                 # CommandRouter, ConversationHistory, PromptBuilder...
 │   ├── adapters/
 │   │   ├── ai/                 # GeminiAdapter, OpenAIAdapter
 │   │   ├── search/             # TavilyAdapter, GoogleGroundingAdapter
 │   │   ├── storage/            # SQLiteStorageAdapter, InMemoryStorageAdapter
 │   │   └── transcriber/        # GeminiTranscriberAdapter
 │   ├── plugins/                # Features como módulos plug-n-play
-│   │   ├── luma/               # LumaPlugin — IA, áudio, persona, stats
+│   │   ├── luma/               # LumaPlugin (IA/persona/stats) + RankPlugin (!rank)
 │   │   ├── media/              # MediaPlugin — sticker, image, gif
 │   │   ├── download/           # DownloadPlugin, AudioDownloadPlugin
 │   │   ├── group-tools/        # GroupToolsPlugin — @everyone, etc.
 │   │   ├── spontaneous/        # SpontaneousPlugin — interações sem trigger
+│   │   ├── reminder/           # ReminderPlugin — !lembrete
+│   │   ├── user/               # UserPlugin — !nick, !apelido
 │   │   ├── resumo/             # ResumoPlugin
 │   │   └── utils/              # UtilsPlugin — !help, !meunumero
 │   ├── infra/
 │   │   ├── Container.js        # DI container (lazy singleton)
 │   │   ├── Bootstrap.js        # Wiring — instancia e conecta tudo
 │   │   ├── BaileysSocketFactory.js
-│   │   ├── MessageRouter.js    # Roteia messages.upsert → MessageHandler via JidQueue
+│   │   ├── MessageRouter.js    # Roteia messages.upsert; enriquece usuários (UserResolver)
 │   │   ├── JidQueue.js         # Fila por JID — serializa mesmo chat, paraleliza chats distintos
+│   │   ├── ReminderScheduler.js # Loop que dispara lembretes vencidos
 │   │   ├── QrCodePresenter.js
 │   │   └── ReconnectionPolicy.js
 │   ├── handlers/
-│   │   ├── MessageHandler.js   # Orquestrador (~40 linhas) — usa PluginManager
+│   │   ├── MessageHandler.js   # Orquestrador — usa PluginManager
 │   │   ├── LumaHandler.js      # Pipeline de IA: histórico, prompt, resposta
 │   │   ├── MediaProcessor.js
 │   │   ├── SpontaneousHandler.js
-│   │   └── ToolDispatcher.js
+│   │   └── ToolDispatcher.js   # Mapeia function calls → ações (inclui schedule_reminder)
 │   ├── managers/
-│   │   ├── ConnectionManager.js
+│   │   ├── ConnectionManager.js  # Ciclo do socket + listeners de contatos + scheduler
 │   │   ├── PersonalityManager.js
 │   │   └── GroupManager.js
-│   ├── services/               # Clientes de APIs externas
+│   ├── services/               # Clientes de APIs externas + Database.js (SQLite)
 │   ├── processors/             # Workers computacionais puros (Sharp, FFmpeg)
 │   ├── config/
 │   │   ├── env.js              # Único lugar que lê process.env
-│   │   ├── constants.js        # Comandos e mensagens de UI
-│   │   └── lumaConfig.js       # Personalidades, prompt templates, tools
+│   │   ├── constants.js        # Comandos e mensagens de UI (aplica overrides)
+│   │   ├── lumaConfig.js       # Personalidades, prompt templates, tools (aplica overrides)
+│   │   ├── ConfigStore.js      # Camada de override (data/config-overrides.json)
+│   │   ├── configSchema.js     # Esquema da config editável pelo dashboard
+│   │   └── configService.js    # Leitura/gravação de config para o dashboard
 │   └── utils/                  # Helpers sem side effects
 ├── tests/
-│   └── unit/                   # Espelha src/, Vitest
+│   └── unit/                   # Espelha src/, Vitest (556 testes)
 ├── docs/                       # Documentação técnica detalhada
-├── data/                       # SQLite (luma_metrics.sqlite)
+├── data/                       # SQLite (luma_metrics.sqlite versionado; privado e overrides NÃO)
 ├── auth_info/                  # Credenciais Baileys — NÃO versionar
 └── .env                        # Variáveis de ambiente — NÃO versionar
 ```
@@ -213,15 +239,21 @@ npm start
 # Bot com hot-reload (desenvolvimento)
 npm run dev
 
-# Bot + Dashboard web
-npm run dashboard
+# Bot + Dashboard web (build a primeira vez; depois é só rodar)
+npm run dashboard:build   # builda dashboard/web/dist (uma vez, ou quando o front mudar)
+npm run dashboard         # sobe o launcher → dashboard + bot
 
-# Dashboard com hot-reload
-npm run dashboard:dev
+# Dashboard React em modo dev (hot-reload, proxy para a API em :3000)
+npm run dashboard:web:dev
 ```
 
+> O `npm run dashboard` usa o launcher (`dashboard/launch.js`), que reinicia o
+> processo automaticamente no auto-deploy e em caso de crash. O backend do
+> dashboard serve o build de `dashboard/web/dist`; se o build não existir, cai
+> no dashboard legado em `src/public`.
+
 **Primeiro acesso:**
-1. Rode o bot
+1. Rode o bot (ou o dashboard)
 2. Escaneie o QR Code que aparece no terminal (ou em `http://localhost:3000` com o dashboard)
 3. Aguarde a confirmação de conexão — as credenciais são salvas em `auth_info/`
 
@@ -250,7 +282,33 @@ WhatsApp → Baileys → MessageRouter (JidQueue)
 
 **Providers de IA:** `AIProviderFactory` seleciona o adapter via `AI_PROVIDER`. `LumaHandler` recebe o provider por injeção de dependência — não sabe qual é. Gemini suporta fallback automático entre modelos (`gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash`).
 
-**Tool calling:** a Luma pode executar ações via function calling da API (`tag_everyone`, `remove_member`, `create_sticker`, `search_web`, `clear_history`, `show_help`). O `ToolDispatcher` mapeia cada função ao plugin responsável.
+**Tool calling:** a Luma pode executar ações via function calling da API (`tag_everyone`, `remove_member`, `create_sticker`, `create_image`, `create_gif`, `search_web`, `clear_history`, `show_help`, `schedule_reminder`). O `ToolDispatcher` mapeia cada função à ação responsável.
+
+**Identidade de usuário:** o `UserResolver` mantém um perfil por JID em `wa_users` (enriquecido por mensagens, eventos de contato e menções) e escolhe o melhor nome na exibição — apelido manual → pushName → notify → contato → verificado → fallback `@últimos6`. Usado por ranking, lembretes e logs.
+
+**Ranking:** cada interação real com a Luma incrementa um contador por `(grupo, pessoa)` em `luma_interactions`. `!rank` mostra o ranking do grupo; `!rank global`, o agregado.
+
+**Lembretes:** persistidos em `reminders` e disparados pelo `ReminderScheduler` (loop de 30s) — sobrevivem a reinícios. A IA calcula a data/hora absoluta (ISO 8601, fuso de Brasília) e o `schedule_reminder` valida e agenda; também há o comando manual `!lembrete`.
+
+---
+
+## 💬 Comandos
+
+| Comando | Função |
+|---|---|
+| `Luma ...` | Fala com a IA (trigger por nome, reply ou em PV) |
+| `!persona` | Menu de personalidades (responda `p1`, `p2`...) |
+| `!luma clear` (`!lc`, `!clear`) | Limpa a memória da sua conversa |
+| `!luma stats` (`!ls`) | Estatísticas globais da Luma |
+| `!sticker` (`!s`) · `!image` (`!i`) · `!gif` (`!g`) | Conversões de mídia |
+| `!download` (`!d`) · `!audio` (`!a`) | Baixa vídeo / áudio (yt-dlp) |
+| `!resumo [n]` | Resume as últimas mensagens |
+| `@everyone` / `@todos` | Marca todos do grupo |
+| `!rank` · `!rank global` | Ranking de interações com a Luma |
+| `!nick <nome>` | Define seu apelido na exibição |
+| `!apelido @fulano <nome>` | Define o apelido de alguém |
+| `!lembrete DD/MM/AAAA HH:mm \| texto` | Agenda lembrete (ou peça à Luma em linguagem natural) |
+| `!meunumero` · `!help` | Seu ID/número · lista de comandos |
 
 ---
 
@@ -318,12 +376,51 @@ npm run test:coverage
 
 ## 🚀 Deploy
 
-O bot roda como processo Node.js simples. Recomendações para produção:
+O dashboard é o processo principal em produção: ele sobe o servidor web e
+spawna o bot (`index.js`) como processo filho.
 
-- **PM2** ou **systemd** para supervisão do processo
+### Produção com PM2 (sobrevive a reboot)
+
+```bash
+npm install -g pm2
+git pull && npm install && npm run dashboard:build
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup        # rode o comando sudo que ele imprimir
+```
+
+A Luma volta sozinha após reboot da máquina e após crash. No auto-deploy, o
+`server.js` sai com código 0 e o PM2 respawna com o código novo.
+
+### Auto-deploy por push na `main`
+
+Configure no `.env` o `DEPLOY_WEBHOOK_SECRET` e aponte um webhook do GitHub
+(push) para `POST /api/deploy`. A cada push na `main`:
+
+```
+git pull → npm install (se mudou) → build do dashboard → restart supervisionado
+```
+
+Assim **backend e dashboard são aplicados sem tocar no servidor**. Sob PM2 (ou
+sob o launcher `npm run dashboard`), o processo se reinicia sozinho; sem
+supervisor, apenas o backend reinicia e um aviso é logado.
+
+### Uso local (só testar)
+
+```bash
+npm install
+npm run dashboard:build   # uma vez
+npm run dashboard         # http://localhost:3000
+```
+
+O launcher reinicia em caso de crash. Não sobrevive a reboot (use PM2 para isso).
+
+### Boas práticas
+
 - **Cloudflare Tunnel** para acesso externo ao dashboard sem abrir portas (`CLOUDFLARE_TUNNEL=true`)
-- Mantenha `auth_info/` e `.env` fora do controle de versão (`.gitignore` já configurado)
+- Mantenha `auth_info/`, `.env` e `data/config-overrides.json` fora do controle de versão (`.gitignore` já configurado)
 - `data/luma_metrics.sqlite` pode ser versionado — contém apenas contadores agregados, sem conteúdo de mensagens
+- O `data/luma_private.sqlite` (personalidades, usuários, ranking, lembretes) **nunca** é versionado
 
 ---
 
@@ -331,10 +428,14 @@ O bot roda como processo Node.js simples. Recomendações para produção:
 
 | Script | O que faz |
 |---|---|
-| `npm start` | Bot em produção |
+| `npm start` | Bot em produção (sem dashboard) |
 | `npm run dev` | Bot com hot-reload |
-| `npm run dashboard` | Bot + Dashboard web |
-| `npm run dashboard:dev` | Dashboard com hot-reload |
+| `npm run dashboard` | Bot + Dashboard web (via launcher, auto-restart) |
+| `npm run dashboard:dev` | Backend do dashboard com hot-reload (nodemon) |
+| `npm run dashboard:web:dev` | App React em modo dev (Vite, hot-reload) |
+| `npm run dashboard:build` | Instala deps e builda o app React em `dashboard/web/dist` |
+| `npm run pm2:start` | Sobe sob PM2 (`ecosystem.config.cjs`) |
+| `npm run pm2:restart` | Reinicia o processo `luma` no PM2 |
 | `npm test` | Suite completa de testes |
 | `npm run test:watch` | Testes em watch mode |
 | `npm run test:coverage` | Testes com relatório de cobertura |
@@ -382,8 +483,9 @@ Leia [`CLAUDE.md`](./CLAUDE.md) antes de contribuir — contém as convenções 
 | [`docs/01-Arquitetura.md`](./docs/01-Arquitetura.md) | Pipeline, camadas, design patterns, fluxos detalhados |
 | [`docs/02-nucleo-ia.md`](./docs/02-nucleo-ia.md) | Prompts, memória, tool calling, busca web, espontaneidade |
 | [`docs/03-motor-midia.md`](./docs/03-motor-midia.md) | Sharp, FFmpeg, stickers, downloads |
-| [`docs/04-banco-dados.md`](./docs/04-banco-dados.md) | Estratégia híbrida SQLite |
-| [`docs/05-conexao-wa.md`](./docs/05-conexao-wa.md) | Baileys, autenticação, reconexão |
+| [`docs/04-banco-dados.md`](./docs/04-banco-dados.md) | SQLite — métricas, usuários, ranking, lembretes |
+| [`docs/05-conexao-wa.md`](./docs/05-conexao-wa.md) | Baileys, autenticação, reconexão, enriquecimento de usuários |
+| [`docs/06-dashboard.md`](./docs/06-dashboard.md) | Dashboard React, API REST, configuração, deploy/PM2 |
 | [`docs/CHANGELOG.md`](./docs/CHANGELOG.md) | Histórico de versões |
 
 ---

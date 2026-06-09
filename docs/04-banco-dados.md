@@ -2,6 +2,76 @@
 
 Adotamos uma arquitetura de **Banco Duplo** para resolver um problema comum em bots open-source: Como compartilhar estatísticas sem vazar dados privados?
 
+> **Implementação real (v7):** o acesso ao SQLite no fluxo vivo é o
+> `DatabaseService` estático em **`src/services/Database.js`** (better-sqlite3,
+> síncrono, ESM). Ele abre os dois arquivos e cria as tabelas no import. O
+> `SQLiteStorageAdapter` (via `StoragePort`/`Container`) existe e implementa a
+> mesma estratégia, mas hoje é usado principalmente em testes. As seções abaixo
+> têm trechos ilustrativos/conceituais — o esquema autoritativo é o que segue.
+
+## 📋 Esquema real (autoritativo)
+
+**`data/luma_metrics.sqlite`** — versionável, sem dados pessoais:
+
+```sql
+CREATE TABLE metrics       (key TEXT PRIMARY KEY, count INTEGER DEFAULT 0);
+CREATE TABLE stats_history (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            data TEXT NOT NULL);
+```
+
+**`data/luma_private.sqlite`** — **nunca** versionado (contém JIDs):
+
+```sql
+-- Personalidade por chat
+CREATE TABLE chat_settings (jid TEXT PRIMARY KEY, personality TEXT NOT NULL,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+
+-- Perfis de usuário (JID → melhor nome humano) — UserResolver
+CREATE TABLE wa_users (
+  jid TEXT PRIMARY KEY, lid TEXT, phone_number TEXT,
+  push_name TEXT, contact_name TEXT, notify_name TEXT,
+  verified_name TEXT, bot_nickname TEXT,
+  first_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Ranking de interações com a Luma (RankPlugin)
+CREATE TABLE luma_interactions (
+  group_jid TEXT NOT NULL,      -- '_pv_' para conversas privadas
+  sender_jid TEXT NOT NULL,
+  count INTEGER DEFAULT 0,
+  last_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (group_jid, sender_jid)
+);
+
+-- Lembretes agendados (ReminderService)
+CREATE TABLE reminders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_jid TEXT NOT NULL, is_group INTEGER NOT NULL DEFAULT 0,
+  creator_jid TEXT NOT NULL,
+  mention_jids TEXT NOT NULL DEFAULT '[]',   -- JSON array de JIDs
+  text TEXT NOT NULL,
+  fire_at INTEGER NOT NULL,                  -- epoch ms (UTC)
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  fired INTEGER DEFAULT 0
+);
+
+-- Histórico de conversa persistido (SQLiteStorageAdapter)
+CREATE TABLE conversation_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, jid TEXT NOT NULL,
+  role TEXT NOT NULL, parts_json TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Padrões: WAL mode nos dois bancos; upserts via `INSERT ... ON CONFLICT DO UPDATE`;
+índices em `luma_interactions(group_jid, count DESC)` e `reminders(fired, fire_at)`.
+Métricas conhecidas: `ai_responses`, `total_messages`, `stickers_created`,
+`images_created`, `gifs_created`, `videos_downloaded`, `audios_downloaded`.
+
+---
+
 ## 🟢 1. O Banco Público (`luma_metrics.sqlite`)
 
 ### Objetivo

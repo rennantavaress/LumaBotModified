@@ -1,14 +1,18 @@
 {
   "name": "luma-bot",
-  "version": "6.1.0",
+  "version": "7.1.0",
   "description": "Assistente de IA multi-provider para WhatsApp com arquitetura hexagonal, plugin system e personalidades dinâmicas.",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "dashboard": "node dashboard/server.js",
+    "dashboard": "node dashboard/launch.js",
     "dashboard:dev": "nodemon dashboard/server.js",
+    "dashboard:web:dev": "npm --prefix dashboard/web run dev",
+    "dashboard:build": "npm --prefix dashboard/web install && npm --prefix dashboard/web run build",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart luma",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

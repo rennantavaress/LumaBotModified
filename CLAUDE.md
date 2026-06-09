@@ -9,7 +9,7 @@
 
 Bot de WhatsApp com uma assistente virtual chamada **Luma** — uma IA com personalidade que se passa por uma pessoa humana no chat. Construído sobre Baileys (WhatsApp Web API) com **Arquitetura Hexagonal**, **Plugin System** e **Injeção de Dependências**.
 
-Stack: Node.js 18+ ESM, Baileys 7.x, Google Gemini / OpenAI / DeepSeek, SQLite, Sharp, FFmpeg, Vitest.
+Stack: Node.js 18+ ESM, Baileys 7.x, Google Gemini / OpenAI / DeepSeek, SQLite, Sharp, FFmpeg, Vitest. Dashboard web em Vite + React + TypeScript + Tailwind (`dashboard/web/`).
 
 ---
 
@@ -42,7 +42,7 @@ Erros: Nunca engula silenciosamente — log + rethrow ou log + fallback explíci
 src/
 ├── core/
 │   ├── ports/          # Contratos abstratos — AIPort, StoragePort, etc.
-│   └── services/       # Lógica de domínio pura — CommandRouter, ConversationHistory, etc.
+│   └── services/       # Lógica de domínio pura — CommandRouter, ConversationHistory, UserResolver, ReminderService, etc.
 ├── adapters/           # Implementações concretas dos ports
 │   ├── ai/             # GeminiAdapter, OpenAIAdapter
 │   ├── search/         # TavilyAdapter, GoogleGroundingAdapter
@@ -50,17 +50,22 @@ src/
 │   └── transcriber/    # GeminiTranscriberAdapter
 ├── plugins/            # Features como módulos plug-n-play
 │   ├── PluginManager.js
-│   ├── luma/           # LumaPlugin — IA, áudio, persona, stats
+│   ├── luma/           # LumaPlugin (IA/áudio/persona/stats) + RankPlugin (!rank)
 │   ├── media/          # MediaPlugin — sticker, image, gif
-│   ├── download/       # DownloadPlugin — !download
+│   ├── download/       # DownloadPlugin, AudioDownloadPlugin
 │   ├── group-tools/    # GroupToolsPlugin — @everyone, etc.
 │   ├── spontaneous/    # SpontaneousPlugin — interações sem trigger
+│   ├── reminder/       # ReminderPlugin — !lembrete
+│   ├── user/           # UserPlugin — !nick, !apelido
+│   ├── resumo/         # ResumoPlugin — !resumo
 │   └── utils/          # UtilsPlugin — !help, !meunumero
 ├── infra/
 │   ├── Container.js        # DI container (lazy singleton)
 │   ├── Bootstrap.js        # Wiring — instancia e conecta tudo
 │   ├── BaileysSocketFactory.js  # Cria socket Baileys
-│   ├── MessageRouter.js    # Roteia messages.upsert → MessageHandler
+│   ├── MessageRouter.js    # Roteia messages.upsert; enriquece usuários via UserResolver
+│   ├── JidQueue.js         # Fila por JID (serializa mesmo chat, paraleliza distintos)
+│   ├── ReminderScheduler.js # Loop de 30s que dispara lembretes vencidos
 │   ├── QrCodePresenter.js  # Exibe QR no terminal e envia sinal ao dashboard
 │   └── ReconnectionPolicy.js    # Decide ação após desconexão (sem executar)
 ├── handlers/
@@ -84,8 +89,11 @@ src/
 │   └── VideoConverter.js
 ├── config/
 │   ├── env.js          # Variáveis de ambiente centralizadas — único lugar que lê process.env
-│   ├── constants.js    # Constantes, comandos e mensagens da UI
-│   └── lumaConfig.js   # Personalidades, prompts, tools da IA
+│   ├── constants.js    # Constantes, comandos e mensagens da UI (aplica overrides)
+│   ├── lumaConfig.js   # Personalidades, prompts, tools da IA (aplica overrides)
+│   ├── ConfigStore.js  # Camada de override (data/config-overrides.json) sobre os defaults
+│   ├── configSchema.js # Esquema da config editável pelo dashboard
+│   └── configService.js # Leitura/gravação de config para o dashboard (env + overrides)
 └── utils/              # Utilitários sem side effects
 ```
 
@@ -188,7 +196,8 @@ vi.mock('../../src/servico/Qualquer.js', () => ({
 - **Não adicione comentários descrevendo o quê o código faz** — só o porquê, quando não for óbvio
 - **Não engula erros com `catch {}`** vazio — pelo menos `Logger.error`
 - **Não quebre o fluxo de plugins** — se adicionar uma feature nova, crie um plugin, não emende no `MessageHandler`
-- **Não versione `auth_info/`, `.env`, `data/luma_private.sqlite`**
+- **Não versione `auth_info/`, `.env`, `data/luma_private.sqlite`, `data/config-overrides.json`, `dashboard/web/node_modules/`, `dashboard/web/dist/`**
+- **Persistência nova usa `DatabaseService`** (`src/services/Database.js`) — é o que está wired no fluxo vivo (o `Container`/`StoragePort` é usado em testes). Não duplique no port a menos que vá usá-lo de fato.
 
 ---
 
@@ -210,12 +219,21 @@ vi.mock('../../src/servico/Qualquer.js', () => ({
 | Formatação e split de respostas      | `src/utils/ResponseFormatter.js`             |
 | Download de mídia do WhatsApp        | `src/handlers/MediaProcessor.js`             |
 | Parsing de comandos                  | `src/core/services/CommandRouter.js`         |
+| Resolver JID → nome humano           | `src/core/services/UserResolver.js`          |
+| Agendamento/validação de lembretes   | `src/core/services/ReminderService.js`       |
+| Disparo de lembretes (loop)          | `src/infra/ReminderScheduler.js`             |
+| Tabelas SQLite e queries             | `src/services/Database.js`                   |
+| Function calls → ações               | `src/handlers/ToolDispatcher.js`             |
+| Camada de override de config         | `src/config/ConfigStore.js`                  |
+| Config editável pelo dashboard       | `src/config/configSchema.js` + `configService.js` |
+| Backend do dashboard / API REST      | `dashboard/server.js`                        |
+| App React do dashboard               | `dashboard/web/src/`                         |
 
 ---
 
 ## Comunicação Dashboard ↔ Bot
 
-O dashboard gerencia o bot como processo filho. A comunicação é via `stdout` com prefixos reservados — **nunca remova esses sinais**:
+`dashboard/server.js` (backend Express + WebSocket + API REST) gerencia o bot como processo filho. A comunicação é via `stdout` com prefixos reservados — **nunca remova esses sinais**:
 
 | Sinal                       | Quando emitir             |
 |-----------------------------|---------------------------|
@@ -223,6 +241,8 @@ O dashboard gerencia o bot como processo filho. A comunicação é via `stdout` 
 | `[LUMA_STATUS]:connected\n` | WhatsApp conectado        |
 | `[LUMA_STATUS]:connecting\n`| Tentando conectar         |
 | `[LUMA_STATUS]:disconnected\n` | Desconectado           |
+
+O frontend é um app **React/Vite/TS** em `dashboard/web/`, buildado para `dashboard/web/dist` (servido pelo Express). Em produção roda sob o launcher (`npm run dashboard` → `dashboard/launch.js`) ou PM2 (`ecosystem.config.cjs`); o auto-deploy (`/api/deploy`) rebuilda o painel e reinicia o processo. Config editável em runtime via `/api/config` (camada de override; aplica no restart). Detalhes em `docs/06-dashboard.md`.
 
 ---
 
@@ -233,5 +253,6 @@ Leia a pasta `docs/` para entender subsistemas específicos:
 - `docs/01-Arquitetura.md` — Fluxos, diagramas e design patterns
 - `docs/02-nucleo-ia.md` — Como a IA funciona (prompts, histórico, tool calling)
 - `docs/03-motor-midia.md` — Processamento de imagens, stickers e vídeos
-- `docs/04-banco-dados.md` — Estratégia híbrida de banco de dados
-- `docs/05-conexao-wa.md` — Baileys, autenticação e reconexão
+- `docs/04-banco-dados.md` — Banco de dados (métricas, usuários, ranking, lembretes)
+- `docs/05-conexao-wa.md` — Baileys, autenticação, reconexão, enriquecimento de usuários
+- `docs/06-dashboard.md` — Dashboard React, API REST, configuração e deploy/PM2

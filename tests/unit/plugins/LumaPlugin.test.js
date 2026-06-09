@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../src/services/Database.js', () => ({
   DatabaseService: {
     incrementMetric: vi.fn(),
+    incrementInteraction: vi.fn(),
     getMetrics: vi.fn().mockReturnValue({ ai_responses: 10, stickers_created: 5 }),
   },
 }));

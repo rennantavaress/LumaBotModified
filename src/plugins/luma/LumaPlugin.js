@@ -79,6 +79,10 @@ export class LumaPlugin {
 
     if (!isPrivate && !isReplyToBot && !isTriggered) return;
 
+    // Conta a interação com a Luma para o ranking (global + por grupo).
+    // '_pv_' agrupa as conversas privadas no ranking global.
+    DatabaseService.incrementInteraction(bot.isGroup ? bot.jid : "_pv_", bot.senderJid);
+
     const groupContext = bot.isGroup ? this.#getGroupContext(bot.jid) : "";
     const historyKey   = bot.isGroup ? `${bot.jid}:${bot.senderJid}` : bot.jid;
 
