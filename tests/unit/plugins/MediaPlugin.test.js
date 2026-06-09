@@ -126,12 +126,12 @@ describe('MediaPlugin - !pdf com imagem', () => {
   });
 });
 
-describe('MediaPlugin - !juntarpdf', () => {
+describe('MediaPlugin - !mergepdf', () => {
   it('adiciona PDF direto na fila do chat', async () => {
     const plugin = new MediaPlugin();
     const bot = makeBot({
       jid: 'merge-add@s.whatsapp.net',
-      body: '!juntarpdf',
+      body: '!mergepdf',
       hasPdf: true,
       raw: { pdf: 1 },
     });
@@ -147,7 +147,7 @@ describe('MediaPlugin - !juntarpdf', () => {
     const plugin = new MediaPlugin();
     const bot = makeBot({
       jid: 'merge-quoted@s.whatsapp.net',
-      body: '!juntarpdf',
+      body: '!mergepdf',
       quotedHasPdf: true,
       getQuotedAdapter: vi.fn().mockReturnValue(quoted),
     });
@@ -162,10 +162,10 @@ describe('MediaPlugin - !juntarpdf', () => {
     const plugin = new MediaPlugin();
     const base = { jid: 'merge-finish@s.whatsapp.net', hasPdf: true };
 
-    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!juntarpdf', raw: { pdf: 1 } }));
-    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!juntarpdf', raw: { pdf: 2 } }));
+    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!mergepdf', raw: { pdf: 1 } }));
+    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!mergepdf', raw: { pdf: 2 } }));
 
-    const finishBot = makeBot({ jid: base.jid, body: '!juntarpdf pronto trabalho final' });
+    const finishBot = makeBot({ jid: base.jid, body: '!mergepdf pronto trabalho final' });
     await plugin.onCommand(COMMANDS.PDF_MERGE, finishBot);
 
     expect(PdfProcessor.merge).toHaveBeenCalledWith([Buffer.from('pdf'), Buffer.from('pdf')]);
@@ -178,7 +178,7 @@ describe('MediaPlugin - !juntarpdf', () => {
 
   it('pede ao menos 2 PDFs antes de finalizar', async () => {
     const plugin = new MediaPlugin();
-    const bot = makeBot({ jid: 'merge-empty@s.whatsapp.net', body: '!juntarpdf pronto' });
+    const bot = makeBot({ jid: 'merge-empty@s.whatsapp.net', body: '!mergepdf pronto' });
 
     await plugin.onCommand(COMMANDS.PDF_MERGE, bot);
 

@@ -56,12 +56,12 @@ import { CommandRouter } from '../../src/core/services/CommandRouter.js';
 import { getMessageType, extractUrl } from '../../src/utils/MessageUtils.js';
 
 describe('CommandRouter.detect — detecção de comandos (via MessageHandler.test)', () => {
-  it('detecta !fig', () => {
-    expect(CommandRouter.detect('!fig')).toBe(COMMANDS.STICKER);
+  it('detecta !sticker', () => {
+    expect(CommandRouter.detect('!sticker')).toBe(COMMANDS.STICKER);
   });
 
-  it('detecta !f (alias do fig)', () => {
-    expect(CommandRouter.detect('!f')).toBe(COMMANDS.STICKER);
+  it('detecta !s (alias do sticker)', () => {
+    expect(CommandRouter.detect('!s')).toBe(COMMANDS.STICKER);
   });
 
   it('detecta !image', () => {
@@ -80,24 +80,24 @@ describe('CommandRouter.detect — detecção de comandos (via MessageHandler.te
     expect(CommandRouter.detect('!g')).toBe(COMMANDS.GIF);
   });
 
-  it('detecta !ajuda', () => {
-    expect(CommandRouter.detect('!ajuda')).toBe(COMMANDS.HELP);
+  it('detecta !help', () => {
+    expect(CommandRouter.detect('!help')).toBe(COMMANDS.HELP);
   });
 
-  it('detecta !menu como alias do ajuda', () => {
+  it('detecta !menu como alias do help', () => {
     expect(CommandRouter.detect('!menu')).toBe(COMMANDS.HELP);
   });
 
-  it('detecta !alma', () => {
-    expect(CommandRouter.detect('!alma')).toBe(COMMANDS.PERSONA);
+  it('detecta !persona', () => {
+    expect(CommandRouter.detect('!persona')).toBe(COMMANDS.PERSONA);
   });
 
-  it('detecta !baixar com URL', () => {
-    expect(CommandRouter.detect('!baixar https://x.com/algo')).toBe(COMMANDS.DOWNLOAD);
+  it('detecta !download com URL', () => {
+    expect(CommandRouter.detect('!download https://x.com/algo')).toBe(COMMANDS.DOWNLOAD);
   });
 
-  it('detecta !bx (alias do baixar)', () => {
-    expect(CommandRouter.detect('!bx https://x.com/algo')).toBe(COMMANDS.DOWNLOAD);
+  it('detecta !d (alias do download)', () => {
+    expect(CommandRouter.detect('!d https://x.com/algo')).toBe(COMMANDS.DOWNLOAD);
   });
 
   it('detecta @everyone', () => {
@@ -108,32 +108,32 @@ describe('CommandRouter.detect — detecção de comandos (via MessageHandler.te
     expect(CommandRouter.detect('@todos')).toBe(COMMANDS.EVERYONE);
   });
 
-  it('detecta !bulma stats', () => {
-    expect(CommandRouter.detect('!bulma stats')).toBe(COMMANDS.LUMA_STATS);
+  it('detecta !luma stats', () => {
+    expect(CommandRouter.detect('!luma stats')).toBe(COMMANDS.LUMA_STATS);
   });
 
-  it('detecta !bs (alias do bulma stats)', () => {
-    expect(CommandRouter.detect('!bs')).toBe(COMMANDS.LUMA_STATS);
+  it('detecta !ls (alias do luma stats)', () => {
+    expect(CommandRouter.detect('!ls')).toBe(COMMANDS.LUMA_STATS);
   });
 
-  it('detecta !bulma clear', () => {
-    expect(CommandRouter.detect('!bulma clear')).toBe(COMMANDS.LUMA_CLEAR);
+  it('detecta !luma clear', () => {
+    expect(CommandRouter.detect('!luma clear')).toBe(COMMANDS.LUMA_CLEAR);
   });
 
-  it('detecta !bc (alias do bulma clear)', () => {
-    expect(CommandRouter.detect('!bc')).toBe(COMMANDS.LUMA_CLEAR);
+  it('detecta !lc (alias do luma clear)', () => {
+    expect(CommandRouter.detect('!lc')).toBe(COMMANDS.LUMA_CLEAR);
   });
 
-  it('detecta !esquecer (alias alternativo do bulma clear)', () => {
-    expect(CommandRouter.detect('!esquecer')).toBe(COMMANDS.LUMA_CLEAR_ALT);
+  it('detecta !clear (alias alternativo do luma clear)', () => {
+    expect(CommandRouter.detect('!clear')).toBe(COMMANDS.LUMA_CLEAR_ALT);
   });
 
-  it('detecta !meuid', () => {
-    expect(CommandRouter.detect('!meuid')).toBe(COMMANDS.MY_NUMBER);
+  it('detecta !meunumero', () => {
+    expect(CommandRouter.detect('!meunumero')).toBe(COMMANDS.MY_NUMBER);
   });
 
-  it('é case insensitive — !FIG detecta como fig', () => {
-    expect(CommandRouter.detect('!FIG')).toBe(COMMANDS.STICKER);
+  it('é case insensitive — !STICKER detecta como sticker', () => {
+    expect(CommandRouter.detect('!STICKER')).toBe(COMMANDS.STICKER);
   });
 
   it('retorna null para texto sem comando', () => {
@@ -144,14 +144,14 @@ describe('CommandRouter.detect — detecção de comandos (via MessageHandler.te
     expect(CommandRouter.detect('')).toBeNull();
   });
 
-  it('retorna null para mensagem da Bulma sem prefixo de comando', () => {
-    expect(CommandRouter.detect('bulma me explica isso')).toBeNull();
+  it('retorna null para mensagem da Luma sem prefixo de comando', () => {
+    expect(CommandRouter.detect('luma me explica isso')).toBeNull();
   });
 });
 
 describe('extractUrl — extração de URLs', () => {
   it('extrai URL https de texto simples', () => {
-    expect(extractUrl('!baixar https://x.com/user/status/123')).toBe('https://x.com/user/status/123');
+    expect(extractUrl('!download https://x.com/user/status/123')).toBe('https://x.com/user/status/123');
   });
 
   it('extrai URL http também', () => {

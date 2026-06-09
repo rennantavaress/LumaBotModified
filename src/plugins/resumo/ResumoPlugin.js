@@ -7,7 +7,7 @@ const MAX_LIMIT = 200;
 const BUFFER_SIZE = 200;
 
 const RESUMO_PROMPT = (conversationText) =>
-  `Você é a Bulma. Abaixo está um trecho recente da conversa deste chat.\n\n` +
+  `Você é a Luma. Abaixo está um trecho recente da conversa deste chat.\n\n` +
   `Faça um resumo natural e descontraído do que foi discutido, como se estivesse contando pra alguém o que rolou no papo. ` +
   `Seja breve (máximo 5 linhas), use seu jeito de falar e não quebre o personagem.\n\n` +
   `Conversa:\n${conversationText}`;
@@ -16,7 +16,7 @@ const RESUMO_PROMPT = (conversationText) =>
  * Plugin de resumo da conversa geral do chat.
  *
  * Acumula todas as mensagens via onMessage e gera um resumo sob demanda.
- * Comandos: !sumario, !sumario <N> (N = número de mensagens, máx 200)
+ * Comandos: !resumo, !resumo <N> (N = número de mensagens, máx 200)
  */
 export class ResumoPlugin {
   static commands = [COMMANDS.RESUMO];
@@ -79,7 +79,7 @@ export class ResumoPlugin {
 
   /** @private */
   _parseLimit(body) {
-    const match = body?.match(/!sumario\s+(\d+)/i);
+    const match = body?.match(new RegExp(`${COMMANDS.RESUMO}\\s+(\\d+)`, 'i'));
     if (!match) return DEFAULT_LIMIT;
     return Math.min(Math.max(parseInt(match[1], 10), 1), MAX_LIMIT);
   }
