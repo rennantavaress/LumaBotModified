@@ -229,7 +229,7 @@ export class LumaHandler {
   extractUserMessage(text) {
     if (!text) return '';
     return text
-      .replace(/^(ei\s+|oi\s+|e\s+aí\s+|fala\s+)?luma[,!?]?\s*/i, '')
+      .replace(/^(ei\s+|oi\s+|e\s+aí\s+|fala\s+)?bulma[,!?]?\s*/i, '')
       .trim();
   }
 

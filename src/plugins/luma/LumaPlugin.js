@@ -7,7 +7,7 @@ import { LUMA_CONFIG } from "../../config/lumaConfig.js";
 /**
  * Plugin principal da Luma: gerencia histórico, personalidade, stats e respostas de IA.
  *
- * Comandos: !luma clear (!lc, !clear), !luma stats (!ls), !persona
+ * Comandos: !bulma clear (!bc, !esquecer), !bulma stats (!bs), !alma
  * onMessage: responde em PV, quando citada, ou quando acionada por trigger
  */
 export class LumaPlugin {
@@ -73,11 +73,12 @@ export class LumaPlugin {
     // Resposta ao menu de personalidade (ex: o usuário responde "p1")
     if (bot.body && await this.#handleMenuReply(bot)) return;
 
-    const isPrivate   = !bot.isGroup;
+    const isPrivate    = !bot.isGroup;
     const isReplyToBot = bot.isRepliedToMe;
-    const isTriggered = bot.body && LumaHandler.isTriggered(bot.body);
+    const isTriggered  = bot.body && LumaHandler.isTriggered(bot.body);
+    const isMentioned  = bot.isMentioned;
 
-    if (!isPrivate && !isReplyToBot && !isTriggered) return;
+    if (!isPrivate && !isReplyToBot && !isTriggered && !isMentioned) return;
 
     // Conta a interação com a Luma para o ranking (global + por grupo).
     // '_pv_' agrupa as conversas privadas no ranking global.
@@ -86,10 +87,10 @@ export class LumaPlugin {
     const groupContext = bot.isGroup ? this.#getGroupContext(bot.jid) : "";
     const historyKey   = bot.isGroup ? `${bot.jid}:${bot.senderJid}` : bot.jid;
 
-    if (bot.hasAudio && (isPrivate || isReplyToBot)) {
+    if (bot.hasAudio && (isPrivate || isReplyToBot || isMentioned)) {
       return await this.lumaHandler.handleAudio(bot, this.audioTranscriber, groupContext, historyKey);
     }
-    if (bot.quotedHasAudio && (isPrivate || isReplyToBot || isTriggered)) {
+    if (bot.quotedHasAudio && (isPrivate || isReplyToBot || isTriggered || isMentioned)) {
       return await this.lumaHandler.handleAudio(bot, this.audioTranscriber, groupContext, historyKey);
     }
 

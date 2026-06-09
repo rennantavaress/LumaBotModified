@@ -147,6 +147,28 @@ export class BaileysAdapter extends MessagingPort {
     }
   }
 
+  /** Verifica se o bot foi marcado (@mencionado) na mensagem. */
+  get isMentioned() {
+    try {
+      const mentioned = this.message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      if (!mentioned.length) return false;
+
+      const me = this.sock.authState?.creds?.me;
+      const clean = (id) => id?.split(":")[0].split("@")[0].replace(/\D/g, "");
+
+      const myIdClean  = me ? clean(me.id)  : clean(this.sock.user?.id);
+      const myLidClean = me ? clean(me.lid) : null;
+
+      return mentioned.some((jid) => {
+        const jidClean = clean(jid);
+        return jidClean === myIdClean || (myLidClean && jidClean === myLidClean);
+      });
+    } catch (e) {
+      Logger.error("Erro ao verificar menção:", e);
+      return false;
+    }
+  }
+
   get quotedMessage() {
     const msg = this.innerMessage;
     const context =
@@ -181,7 +203,7 @@ export class BaileysAdapter extends MessagingPort {
    */
   get quotedSenderName() {
     if (!this.quotedMessage) return null;
-    if (this.isRepliedToMe) return 'Luma';
+    if (this.isRepliedToMe) return 'Bulma';
 
     const msg = this.innerMessage;
     const context =

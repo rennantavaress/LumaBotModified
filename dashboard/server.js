@@ -525,6 +525,17 @@ app.post('/api/deploy', (req, res) => {
   scheduleDeploy();
 });
 
+// ─── Health Check ─────────────────────────────────────────────────────────────
+
+app.get('/health', (_req, res) => {
+  const isHealthy = botStatus === 'running' || botStatus === 'qr_wait';
+  res.status(isHealthy ? 200 : 503).json({
+    status: botStatus,
+    timestamp: Date.now(),
+    uptime: getUptime(),
+  });
+});
+
 // ─── Servir a aplicação ────────────────────────────────────────────────────────
 // Com build React presente, os assets são públicos (a UI cuida do login via API).
 // Sem build, mantém o dashboard legado (vanilla) protegido pelo authMiddleware.
