@@ -159,14 +159,14 @@ export class MediaPlugin {
     const action = getPdfMergeAction(bot.body);
     const lowerAction = action.toLowerCase();
 
-    if (lowerAction.startsWith("limpar") || lowerAction.startsWith("cancelar")) {
+    if (/^(clear|limpar|cancelar)\b/i.test(lowerAction)) {
       MediaPlugin.#pdfMergeQueues.delete(key);
       await bot.reply(MESSAGES.PDF_MERGE_CLEARED);
       return;
     }
 
-    if (lowerAction.startsWith("pronto") || lowerAction.startsWith("finalizar")) {
-      return this.#finishPdfMerge(bot, key, action.replace(/^(pronto|finalizar)\s*/i, ""));
+    if (/^(done|pronto|finalizar)\b/i.test(lowerAction)) {
+      return this.#finishPdfMerge(bot, key, action.replace(/^(done|pronto|finalizar)\s*/i, ""));
     }
 
     const source = bot.hasPdf ? bot : bot.quotedHasPdf ? bot.getQuotedAdapter() : null;

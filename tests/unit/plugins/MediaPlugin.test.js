@@ -24,7 +24,7 @@ vi.mock('../../../src/services/Database.js', () => ({
 const { MediaPlugin } = await import('../../../src/plugins/media/MediaPlugin.js');
 const { MediaProcessor } = await import('../../../src/handlers/MediaProcessor.js');
 const { PdfProcessor } = await import('../../../src/processors/PdfProcessor.js');
-const { COMMANDS } = await import('../../../src/config/constants.js');
+const { COMMANDS, MESSAGES } = await import('../../../src/config/constants.js');
 
 function makeBot(overrides = {}) {
   return {
@@ -174,6 +174,35 @@ describe('MediaPlugin - !mergepdf', () => {
       mimetype: 'application/pdf',
       fileName: 'trabalho-final.pdf',
     });
+  });
+
+  it('finaliza com a keyword "done" (anunciada na mensagem de uso)', async () => {
+    const plugin = new MediaPlugin();
+    const base = { jid: 'merge-done@s.whatsapp.net', hasPdf: true };
+
+    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!mergepdf', raw: { pdf: 1 } }));
+    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!mergepdf', raw: { pdf: 2 } }));
+
+    const finishBot = makeBot({ jid: base.jid, body: '!mergepdf done trabalho final' });
+    await plugin.onCommand(COMMANDS.PDF_MERGE, finishBot);
+
+    expect(PdfProcessor.merge).toHaveBeenCalledWith([Buffer.from('pdf'), Buffer.from('pdf')]);
+    expect(finishBot.sendMessage).toHaveBeenCalledWith(base.jid, {
+      document: Buffer.from('merged-pdf'),
+      mimetype: 'application/pdf',
+      fileName: 'trabalho-final.pdf',
+    });
+  });
+
+  it('cancela com a keyword "clear"', async () => {
+    const plugin = new MediaPlugin();
+    const base = { jid: 'merge-clear@s.whatsapp.net', hasPdf: true };
+
+    await plugin.onCommand(COMMANDS.PDF_MERGE, makeBot({ ...base, body: '!mergepdf', raw: { pdf: 1 } }));
+    const clearBot = makeBot({ jid: base.jid, body: '!mergepdf clear' });
+    await plugin.onCommand(COMMANDS.PDF_MERGE, clearBot);
+
+    expect(clearBot.reply).toHaveBeenCalledWith(MESSAGES.PDF_MERGE_CLEARED);
   });
 
   it('pede ao menos 2 PDFs antes de finalizar', async () => {
