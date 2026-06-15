@@ -6,6 +6,8 @@ import { PersonalityManager } from "../managers/PersonalityManager.js";
 import { MENUS } from "../config/constants.js";
 import { LUMA_CONFIG } from "../config/lumaConfig.js";
 import { ReminderService } from "../core/services/ReminderService.js";
+import { RankPlugin } from "../plugins/luma/RankPlugin.js";
+import { UserPlugin } from "../plugins/user/UserPlugin.js";
 
 /**
  * Despachante de ferramentas acionadas pela IA.
@@ -48,6 +50,12 @@ export class ToolDispatcher {
                         break;
                     case "show_personality_menu":
                         await this.handleShowPersonalityMenu(bot);
+                        break;
+                    case "show_rank":
+                        await this.handleShowRank(bot, call.args);
+                        break;
+                    case "set_nickname":
+                        await this.handleSetNickname(bot, call.args);
                         break;
                     default:
                         Logger.warn(`⚠️ Ferramenta desconhecida: ${call.name}`);
@@ -253,6 +261,104 @@ export class ToolDispatcher {
 
     static async handleShowHelp(bot) {
         await bot.sendText(MENUS.HELP_TEXT);
+    }
+
+    /**
+     * Exibe a lista do ranking ou a posição de uma pessoa. Menções reais têm
+     * prioridade; pedidos por nome dependem de correspondência exata.
+     */
+    static async handleShowRank(bot, args) {
+        const scope = this.resolveRankScope(bot);
+        const target = String(args?.target || "").trim();
+
+        let targetJid = null;
+        let targetName = null;
+
+        if (/^(eu|me|self|myself)$/i.test(target)) {
+            targetJid = bot.senderJid;
+        } else if (target) {
+            const mentioned = await this.getActionTargetMentions(bot);
+            targetJid = mentioned[0] ?? null;
+            targetName = target;
+        }
+
+        await RankPlugin.showRanking(bot, { scope, targetJid, targetName });
+    }
+
+    /**
+     * Em grupos, ranking global exige intenção explícita na mensagem original.
+     * Isso impede que uma classificação imprecisa da IA transforme "manda o
+     * rank" em ranking global. Em conversas privadas, só existe escopo global.
+     */
+    static resolveRankScope(bot) {
+        if (!bot.isGroup) return "global";
+
+        const normalized = String(bot.body || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[!?.,:;]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+        const explicitlyGroup =
+            /\b(rank|ranking)\b.*\b(do|desse|deste)\s+grupo\b/.test(normalized) ||
+            /\b(rank|ranking)\s+(daqui|local)\b/.test(normalized) ||
+            /\b(manda|mostra|envia|exibe)\s+o\s+(do|desse|deste)\s+grupo\b/.test(normalized);
+
+        if (explicitlyGroup) return "group";
+
+        // Continuação inequívoca de uma consulta anterior, sem exigir que a
+        // pessoa repita "rank": "mas e o geral?", "mas e no geral?", etc.
+        const conciseGlobalFollowUp =
+            /^(?:luma\s+)?(?:(?:mas\s+)?e\s+)?(?:(?:quero\s+ver|mostra|manda|envia|exibe|cade)(?:\s+(?:o|no|na))?\s+)?(?:(?:o|no|na)\s+)?(?:(?:rank|ranking)\s+)?(?:geral|global)(?:\s+luma)?$/.test(normalized);
+
+        const explicitlyGlobal =
+            /\b(rank|ranking)\s+(global|geral)\b/.test(normalized) ||
+            /\b(global|geral)\s+(rank|ranking)\b/.test(normalized) ||
+            /\b(rank|ranking)\b.*\b(todos os chats|todos os grupos|geral de todos)\b/.test(normalized) ||
+            conciseGlobalFollowUp;
+
+        return explicitlyGlobal ? "global" : "group";
+    }
+
+    /**
+     * Define apelidos por linguagem natural. Para terceiros, exige uma menção
+     * real na mensagem; o texto produzido pelo modelo nunca escolhe um JID.
+     */
+    static async handleSetNickname(bot, args) {
+        const target = String(args?.target || "").trim().toLowerCase();
+        let targetJid = bot.senderJid;
+
+        if (target === "mentioned_user") {
+            const mentioned = await this.getActionTargetMentions(bot);
+            if (!mentioned.length) {
+                await bot.reply("⚠️ Marca a pessoa cujo apelido você quer alterar.");
+                return;
+            }
+            targetJid = mentioned[0];
+        } else if (target !== "self") {
+            Logger.warn("Alvo inválido na ferramenta set_nickname");
+            return;
+        }
+
+        await UserPlugin.setNickname(bot, {
+            nickname: args?.nickname,
+            targetJid,
+        });
+    }
+
+    /** Retorna menções da mensagem excluindo a própria Luma. */
+    static async getActionTargetMentions(bot) {
+        const mentioned = await bot.getMentionedJids();
+        const me = bot.socket?.authState?.creds?.me;
+        const clean = (jid) => String(jid || "").split(":")[0].split("@")[0].replace(/\D/g, "");
+        const ownIds = new Set([
+            clean(me?.id || bot.socket?.user?.id),
+            clean(me?.lid),
+        ].filter(Boolean));
+
+        return mentioned.filter((jid) => !ownIds.has(clean(jid)));
     }
 
     /**

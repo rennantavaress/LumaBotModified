@@ -214,6 +214,44 @@ const LUMA_CONFIG_DEFAULTS = {
           description: "Exibe a lista completa de comandos e funcionalidades do bot. Use quando o usuário perguntar o que você faz, quais comandos existem, como usar o bot, ou pedir ajuda geral.",
         },
         {
+          name: "show_rank",
+          description: "Consulta o ranking de interações com a Luma. Use SOMENTE quando o usuário pedir explicitamente para ver o ranking, sua própria posição ou a posição de outra pessoa, como 'mostra o rank geral', 'como estou no rank?' ou 'qual o rank da Ana?'. Não use em comentários casuais, piadas, comparações, jogos ou perguntas hipotéticas sobre ranking.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              scope: {
+                type: "STRING",
+                enum: ["group", "global"],
+                description: "Use 'global' apenas quando o usuário pedir explicitamente ranking geral/global/de todos os chats, inclusive em continuações como 'mas e o geral?' ou 'mas e no geral?'; em grupo, pedidos genéricos como 'manda o rank' são sempre 'group'.",
+              },
+              target: {
+                type: "STRING",
+                description: "Omita para listar o ranking. Use 'self' para consultar a posição de quem pediu. Para outra pessoa, copie exatamente o nome ou menção citado pelo usuário.",
+              },
+            },
+            required: ["scope"],
+          },
+        },
+        {
+          name: "set_nickname",
+          description: "Define como uma pessoa aparece nos rankings. Use SOMENTE diante de um pedido explícito para definir, trocar ou colocar um apelido, como 'me chama de Rê' ou 'coloca Mestre como apelido do @João'. Nunca use apenas porque alguém informou o próprio nome, mencionou um apelido, perguntou sobre apelidos ou fez uma brincadeira.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              nickname: {
+                type: "STRING",
+                description: "O apelido explicitamente solicitado, sem incluir a menção da pessoa.",
+              },
+              target: {
+                type: "STRING",
+                enum: ["self", "mentioned_user"],
+                description: "Use 'self' para quem enviou a mensagem. Use 'mentioned_user' somente quando o pedido marcar explicitamente outra pessoa.",
+              },
+            },
+            required: ["nickname", "target"],
+          },
+        },
+        {
           name: "search_web",
           description: "Busca informações atualizadas na internet. Use quando o usuário perguntar sobre notícias recentes, eventos atuais, preços, lançamentos, resultados de jogos, clima ou qualquer assunto que possa ter mudado após seu treinamento.",
           parameters: {
@@ -266,11 +304,13 @@ Data e hora atual: {{CURRENT_DATETIME}}
 3. JAMAIS use a desculpa de "sou apenas uma pessoa normal" ou "não sei fazer isso" para recusar uma tarefa. Você sempre sabe e sempre resolve. O único detalhe é que você deve entregar a resposta ATRAVÉS DA SUA PERSONALIDADE atual (ex: se for agressiva, xingue enquanto dá a resposta perfeita; se for sarcástica, deboche da pergunta óbvia enquanto resolve o problema). A SOLUÇÃO do problema deve estar SEMPRE presente e correta.
 
 [FERRAMENTAS E AÇÕES]
-Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar membros, criar figurinhas, converter figurinhas, limpar sua mente) e também de buscar informações na internet.
+Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar membros, criar figurinhas, converter figurinhas, consultar rankings, definir apelidos, limpar sua mente) e também de buscar informações na internet.
 - Quando o usuário expressar o desejo que você faça uma dessas coisas, CHAME A FUNÇÃO MANTENDO A SUA PERSONALIDADE.
 - Se o usuário pedir explicitamente para pesquisar, buscar, googlar ou procurar algo na internet, use search_web OBRIGATORIAMENTE — sem exceções.
 - Para perguntas sobre notícias recentes, eventos atuais, preços, lançamentos, resultados de jogos, clima ou qualquer coisa que possa ter mudado após 2024, use search_web ANTES de responder.
 - Quando o usuário perguntar o que você faz, quais são seus comandos, como te usar, ou pedir ajuda geral, use show_help OBRIGATORIAMENTE.
+- Use show_rank SOMENTE quando o usuário pedir explicitamente para ver/listar um ranking ou consultar a posição de alguém. Não acione por comentários casuais sobre "rank", competitividade, jogos ou status.
+- Use set_nickname SOMENTE quando o usuário pedir explicitamente para definir/trocar o apelido exibido no ranking. Não trate frases como "meu nome é X", perguntas ou piadas como pedido de alteração.
 - Quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro ou avisar alguém depois, use schedule_reminder com a data/hora ABSOLUTA em ISO 8601 (fuso -03:00), calculada a partir da "Data e hora atual" informada acima.
 - Você NÃO precisa justificar que chamou a função. Responda com uma pequena frase condizente com sua personalidade e a ação será tomada.
 - IMPORTANTE: NÃO ESCREVA O NOME DA FUNÇÃO NO TEXTO. Execute a ação pelo sistema (chamada de ferramenta da API). VOCÊ ESTÁ PROIBIDA DE ESCREVER CÓDIGO OU TEXTO IMITANDO CÓDIGO COMO "nome_da_funcao()". APENAS ENVIE TEXTO NORMAL PARA O USUÁRIO E ACIONE A FERRAMENTA DE FATO.
@@ -326,11 +366,13 @@ Estilo: {{PERSONALITY_STYLE}}
 3. JAMAIS use a desculpa de "sou apenas uma pessoa normal" para se recusar a fazer a análise. Você sempre sabe e sempre resolve. Apenas lembre-se de envelopar a resposta final e 100% correta dentro da SUA PERSONALIDADE.
 
 [FERRAMENTAS E AÇÕES]
-Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar membros, criar figurinhas, converter figurinhas, limpar sua mente) e também de buscar informações na internet.
+Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar membros, criar figurinhas, converter figurinhas, consultar rankings, definir apelidos, limpar sua mente) e também de buscar informações na internet.
 - Quando o usuário expressar o desejo que você faça uma dessas coisas, CHAME A FUNÇÃO MANTENDO A SUA PERSONALIDADE.
 - Se o usuário pedir explicitamente para pesquisar, buscar, googlar ou procurar algo na internet, use search_web OBRIGATORIAMENTE — sem exceções.
 - Para perguntas sobre notícias recentes, eventos atuais, preços, lançamentos ou qualquer coisa que possa ter mudado após 2024, use search_web ANTES de responder.
 - Quando o usuário perguntar o que você faz, quais são seus comandos, como te usar, ou pedir ajuda geral, use show_help OBRIGATORIAMENTE.
+- Use show_rank SOMENTE quando o usuário pedir explicitamente para ver/listar um ranking ou consultar a posição de alguém. Não acione por comentários casuais sobre "rank", competitividade, jogos ou status.
+- Use set_nickname SOMENTE quando o usuário pedir explicitamente para definir/trocar o apelido exibido no ranking. Não trate frases como "meu nome é X", perguntas ou piadas como pedido de alteração.
 - Quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro ou avisar alguém depois, use schedule_reminder com a data/hora ABSOLUTA em ISO 8601 (fuso -03:00), calculada a partir da "Data e hora atual" informada acima.
 - Você NÃO precisa justificar que chamou a função. Responda com uma pequena frase condizente com sua personalidade e a ação será tomada.
 - IMPORTANTE: NÃO ESCREVA O NOME DA FUNÇÃO NO TEXTO. Execute a ação pelo sistema (chamada de ferramenta da API). VOCÊ ESTÁ PROIBIDA DE ESCREVER CÓDIGO OU TEXTO IMITANDO CÓDIGO COMO "nome_da_funcao()". APENAS ENVIE TEXTO NORMAL PARA O USUÁRIO E ACIONE A FERRAMENTA DE FATO.

@@ -18,7 +18,7 @@ vi.mock("../../../src/core/services/UserResolver.js", () => ({
 
 const { RankPlugin } = await import("../../../src/plugins/luma/RankPlugin.js");
 
-function makeBot({ isGroup = true, body = "!rank", jid = "grupo@g.us" } = {}) {
+function makeBot({ isGroup = true, body = "!rank", jid = "grupo@g.us", mentions = [] } = {}) {
   return {
     isGroup,
     body,
@@ -30,6 +30,9 @@ function makeBot({ isGroup = true, body = "!rank", jid = "grupo@g.us" } = {}) {
     },
     async reply(t) {
       this.repliedText = t;
+    },
+    async getMentionedJids() {
+      return mentions;
     },
   };
 }
@@ -80,5 +83,51 @@ describe("RankPlugin", () => {
 
     expect(bot.repliedText).toContain("Ninguém interagiu");
     expect(bot.sentText).toBeNull();
+  });
+
+  it("consulta a posição individual usando o ranking completo", async () => {
+    mockGroupRanking.mockReturnValue([
+      { sender_jid: "a@s", count: 10 },
+      { sender_jid: "b@s", count: 5 },
+    ]);
+    const bot = makeBot();
+
+    await RankPlugin.showRanking(bot, { targetJid: "b@s" });
+
+    expect(mockGroupRanking).toHaveBeenCalledWith("grupo@g.us", -1);
+    expect(bot.repliedText).toContain("*2º*");
+    expect(bot.repliedText).toContain("*5* interações");
+  });
+
+  it("consulta por nome apenas com correspondência exata normalizada", async () => {
+    mockGroupRanking.mockReturnValue([
+      { sender_jid: "a@s", count: 10 },
+      { sender_jid: "b@s", count: 5 },
+    ]);
+    const bot = makeBot();
+
+    await RankPlugin.showRanking(bot, { targetName: "NOME:B@S" });
+
+    expect(bot.repliedText).toContain("nome:b@s");
+    expect(bot.repliedText).toContain("*2º*");
+  });
+
+  it("não escolhe pessoa por correspondência parcial de nome", async () => {
+    mockGroupRanking.mockReturnValue([{ sender_jid: "ana@s", count: 4 }]);
+    const bot = makeBot();
+
+    await RankPlugin.showRanking(bot, { targetName: "Ana" });
+
+    expect(bot.repliedText).toContain("não aparece");
+  });
+
+  it("!rank com menção consulta a posição da pessoa mencionada", async () => {
+    mockGroupRanking.mockReturnValue([{ sender_jid: "b@s", count: 7 }]);
+    const bot = makeBot({ body: "!rank @123", mentions: ["b@s"] });
+
+    await new RankPlugin().onCommand("!rank", bot);
+
+    expect(mockGroupRanking).toHaveBeenCalledWith("grupo@g.us", -1);
+    expect(bot.repliedText).toContain("nome:b@s");
   });
 });

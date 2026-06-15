@@ -4,8 +4,9 @@ import { UserResolver } from "../../core/services/UserResolver.js";
 /**
  * Plugin de identidade de usuário: apelidos manuais.
  *
- * - !apelido <nome>          → define o apelido de quem enviou
- * - !alcunha @fulano <nome>  → define o apelido da pessoa mencionada
+ * - !nick <nome>             → define o apelido de quem enviou
+ * - !nick @fulano <nome>     → define o apelido da pessoa mencionada
+ * - set_nickname             → executa os mesmos fluxos via linguagem natural
  *
  * O apelido tem prioridade máxima na exibição (rankings, lembretes, logs),
  * resolvendo casos de JID @lid, pushName ausente ou nome desatualizado.
@@ -13,39 +14,49 @@ import { UserResolver } from "../../core/services/UserResolver.js";
 export class UserPlugin {
   static commands = [COMMANDS.NICK, COMMANDS.NICK_ALT];
 
+  static normalizeNickname(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 60);
+  }
+
+  static async setNickname(bot, { nickname, targetJid = bot.senderJid } = {}) {
+    const cleanNickname = this.normalizeNickname(nickname);
+    if (!cleanNickname) {
+      await bot.reply("ℹ️ Me diz qual apelido você quer definir.");
+      return false;
+    }
+
+    UserResolver.setNickname(targetJid, cleanNickname);
+
+    if (targetJid === bot.senderJid) {
+      await bot.reply(`✅ Apelido definido: *${cleanNickname}*`);
+      return true;
+    }
+
+    await bot.reply(`✅ Apelido de @${targetJid.split("@")[0]} definido: *${cleanNickname}*`, {
+      mentions: [targetJid],
+    });
+    return true;
+  }
+
   async onCommand(command, bot) {
     const body = bot.body || "";
-
-    if (command === COMMANDS.NICK) {
-      const nick = body.slice(COMMANDS.NICK.length).trim();
-      if (!nick) {
-        await bot.reply("ℹ️ Uso: *!apelido SeuNome*");
-        return;
-      }
-      UserResolver.setNickname(bot.senderJid, nick);
-      await bot.reply(`✅ Apelido definido: *${nick}*`);
-      return;
-    }
-
-    // !alcunha @fulano <nome>
     const mentioned = await bot.getMentionedJids();
-    if (mentioned.length === 0) {
-      await bot.reply("ℹ️ Uso: *!alcunha @pessoa Nome*");
-      return;
-    }
-    const target = mentioned[0];
-    // Remove o comando e os tokens de menção (@123456) sobrando, restando só o nome.
+    const targetJid = mentioned[0] ?? bot.senderJid;
+
+    // Remove o comando e eventuais tokens de menção, restando só o apelido.
     const nick = body
-      .slice(COMMANDS.NICK_ALT.length)
+      .slice(command.length)
       .replace(/@\d+/g, "")
       .trim();
+
     if (!nick) {
-      await bot.reply("ℹ️ Uso: *!alcunha @pessoa Nome*");
+      await bot.reply("ℹ️ Uso: *!nick SeuNome* ou *!nick @pessoa Nome*");
       return;
     }
-    UserResolver.setNickname(target, nick);
-    await bot.reply(`✅ Apelido de @${target.split("@")[0]} definido: *${nick}*`, {
-      mentions: [target],
-    });
+
+    await UserPlugin.setNickname(bot, { nickname: nick, targetJid });
   }
 }
