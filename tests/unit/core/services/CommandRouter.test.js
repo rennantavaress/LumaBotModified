@@ -49,4 +49,28 @@ describe('CommandRouter.detect — comandos', () => {
     expect(CommandRouter.detect('!STICKER')).toBe('!sticker');
     expect(CommandRouter.detect('!Help')).toBe('!help');
   });
+
+  it.each([
+    'faz uma figurinha disso',
+    'Luma transforma isso em sticker',
+    'poderia criar uma figurinha pra mim?',
+    'me faz uma figurinha',
+    'consegue criar um sticker?',
+    'tem como fazer figurinha disso?',
+    'figurinha',
+  ])('detecta pedido contextual de sticker: "%s"', (input) => {
+    expect(CommandRouter.detect(input, { hasStickerSource: true })).toBe('!sticker');
+  });
+
+  it('nao detecta pedido contextual sem uma fonte para o sticker', () => {
+    expect(CommandRouter.detect('faz uma figurinha disso')).toBeNull();
+  });
+
+  it.each([
+    'como fazer uma figurinha?',
+    'essa figurinha ficou boa',
+    'me explica como criar sticker',
+  ])('nao confunde conversa sobre sticker com comando: "%s"', (input) => {
+    expect(CommandRouter.detect(input, { hasStickerSource: true })).toBeNull();
+  });
 });

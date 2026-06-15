@@ -271,6 +271,20 @@ describe('MediaPlugin - !sticker com texto', () => {
       { text: 'texto da figurinha' },
     );
   });
+
+  it('nao usa o pedido contextual como texto da figurinha', async () => {
+    const plugin = new MediaPlugin();
+    const bot    = makeBot({ body: 'faz uma figurinha disso', hasMedia: true });
+
+    await plugin.onCommand(COMMANDS.STICKER, bot);
+
+    expect(MediaProcessor.processToSticker).toHaveBeenCalledWith(
+      bot.raw,
+      bot.socket,
+      null,
+      { text: null },
+    );
+  });
 });
 
 describe('MediaPlugin — !sticker sem mídia', () => {

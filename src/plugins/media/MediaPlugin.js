@@ -40,6 +40,8 @@ function getPdfMergeKey(bot) {
 }
 
 function getStickerText(body) {
+  if (!/^\s*!(sticker|s)(?:\s|$)/i.test(body || "")) return null;
+
   const rawText = body
     ?.replace(/^\s*!(sticker|s)\s*/i, "")
     .trim();

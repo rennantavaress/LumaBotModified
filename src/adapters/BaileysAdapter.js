@@ -238,7 +238,14 @@ export class BaileysAdapter extends MessagingPort {
     const q = this.quotedMessage;
     if (!q) return false;
     const unwrapped = BaileysAdapter.unwrapMessage(q);
-    return !!(unwrapped?.imageMessage || unwrapped?.stickerMessage || q?.imageMessage || q?.stickerMessage);
+    return !!(
+      unwrapped?.imageMessage ||
+      unwrapped?.videoMessage ||
+      unwrapped?.stickerMessage ||
+      q?.imageMessage ||
+      q?.videoMessage ||
+      q?.stickerMessage
+    );
   }
 
   /**

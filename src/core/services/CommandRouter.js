@@ -10,7 +10,11 @@ import { COMMANDS } from "../../config/constants.js";
  * @returns {string|null} Uma das constantes COMMANDS ou null
  */
 export class CommandRouter {
-  static detect(text) {
+  /**
+   * @param {string|null} text
+   * @param {{ hasStickerSource?: boolean }} context
+   */
+  static detect(text, context = {}) {
     if (!text) return null;
     const lower = text.toLowerCase();
 
@@ -43,6 +47,47 @@ export class CommandRouter {
     if (lower.startsWith(COMMANDS.REMINDER_SHORT)) return COMMANDS.REMINDER;
     if (lower.startsWith(COMMANDS.REMINDER))       return COMMANDS.REMINDER;
 
+    if (context.hasStickerSource && this.isContextualStickerRequest(text)) {
+      return COMMANDS.STICKER;
+    }
+
     return null;
+  }
+
+  /**
+   * Detecta pedidos naturais e inequívocos de criação de figurinha.
+   * A execução só é habilitada por detect() quando existe mídia visual ou URL
+   * no contexto, evitando interpretar perguntas sobre figurinhas como comandos.
+   */
+  static isContextualStickerRequest(text) {
+    if (!text) return false;
+
+    const normalized = text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/[!?.,:;]+/g, " ")
+      .replace(/\s+/g, " ");
+
+    const hasStickerTarget = /\b(figurinha|sticker)\b/.test(normalized);
+    if (!hasStickerTarget) return false;
+
+    if (
+      /^como\b/.test(normalized) ||
+      /\b(tutorial|explica|explique|ensina|ensine)\b/.test(normalized) ||
+      /\b(saber|aprender)\s+como\b/.test(normalized)
+    ) {
+      return false;
+    }
+
+    const conciseRequest =
+      /^(?:uma?\s+)?(?:figurinha|sticker)(?:\s+(?:disso|dessa|desse|disto|por favor|pfv|pra mim))*$/;
+    if (conciseRequest.test(normalized)) return true;
+
+    const requestStart =
+      /^(?:(?:ei|oi|fala)\s+)?(?:luma\s+)?(?:me\s+)?(?:faz|faca|fazer|cria|crie|criar|gera|gere|gerar|transforma|transforme|transformar|converte|converta|converter|vira|vire|virar|manda|mande|mandar|quero|pode|poderia|consegue|conseguiria|tem como)\b/;
+
+    return requestStart.test(normalized);
   }
 }

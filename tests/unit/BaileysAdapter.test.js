@@ -403,6 +403,27 @@ describe('BaileysAdapter — mensagem citada (quoted)', () => {
     expect(adapter.quotedHasAudio).toBe(true);
   });
 
+  it('quotedHasVisualContent retorna true para video citado', () => {
+    const sock = createSocketMock();
+    const msg = {
+      key: { remoteJid: '120363000000000@g.us', fromMe: false, id: 'test_id_video_reply', participant: '5511@s.whatsapp.net' },
+      pushName: 'Teste',
+      message: {
+        extendedTextMessage: {
+          text: 'faz uma figurinha disso',
+          contextInfo: {
+            stanzaId: 'video_msg_id',
+            participant: '5511@s.whatsapp.net',
+            quotedMessage: { videoMessage: { mimetype: 'video/mp4' } },
+          },
+        },
+      },
+    };
+
+    const adapter = new BaileysAdapter(sock, msg);
+    expect(adapter.quotedHasVisualContent).toBe(true);
+  });
+
   it('getQuotedAdapter retorna null quando não há quoted', () => {
     const sock = createSocketMock();
     const adapter = new BaileysAdapter(sock, createTextMessage('sem quoted'));

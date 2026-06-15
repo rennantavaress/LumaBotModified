@@ -17,6 +17,7 @@ import { UtilsPlugin } from "../plugins/utils/UtilsPlugin.js";
 import { ResumoPlugin } from "../plugins/resumo/ResumoPlugin.js";
 import { UserPlugin } from "../plugins/user/UserPlugin.js";
 import { ReminderPlugin } from "../plugins/reminder/ReminderPlugin.js";
+import { extractUrl } from "../utils/MessageUtils.js";
 
 /** Instancia o AudioTranscriber com o melhor provider disponível. */
 function buildAudioTranscriber() {
@@ -61,7 +62,9 @@ export class MessageHandler {
   static async process(bot) {
     if (CONFIG.IGNORE_SELF && bot.isFromMe) return;
     if (bot.isGroup && !bot.isFromMe) SpontaneousHandler.trackActivity(bot.jid);
-    const command = CommandRouter.detect(bot.body);
+    const command = CommandRouter.detect(bot.body, {
+      hasStickerSource: bot.hasVisualContent || bot.quotedHasVisualContent || !!extractUrl(bot.body),
+    });
     await MessageHandler.pluginManager.dispatch(command, bot);
   }
 }
