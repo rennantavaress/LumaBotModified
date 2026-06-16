@@ -1,4 +1,4 @@
-import { COMMANDS, MESSAGES, COMMAND_EMOJIS } from "../../config/constants.js";
+import { COMMANDS, MESSAGES} from "../../config/constants.js";
 import { VideoDownloader } from "../../services/VideoDownloader.js";
 import { DatabaseService } from "../../services/Database.js";
 import { extractUrl, isVideoUrl, getMessageText } from "../../utils/MessageUtils.js";
