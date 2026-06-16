@@ -6,7 +6,7 @@ import { Logger } from "../../utils/Logger.js";
 import fs from "fs/promises";
 import path from "path";
 
-// No início do arquivo, depois dos imports
+// Emojis locais
 const EMOJIS = {
   "!musica": "🎵",
   "!music": "🎵",
@@ -17,19 +17,17 @@ const EMOJIS = {
 };
 
 export class AudioDownloadPlugin {
-  // ✅ Adicionar novos aliases musicais
   static commands = [
-    COMMANDS.MUSIC,              // !musica
-    COMMANDS.MUSIC_EN,           // !music
-    COMMANDS.SONG,               // !song
-    COMMANDS.TRACK,              // !track
-    COMMANDS.AUDIO_DOWNLOAD,     // !audio
-    COMMANDS.AUDIO_DOWNLOAD_SHORT, // !a
+    COMMANDS.MUSIC,
+    COMMANDS.MUSIC_EN,
+    COMMANDS.SONG,
+    COMMANDS.TRACK,
+    COMMANDS.AUDIO_DOWNLOAD,
+    COMMANDS.AUDIO_DOWNLOAD_SHORT,
   ];
 
   async onCommand(command, bot) {
     try {
-      // Extrair URL de múltiplas fontes
       const url = this.#extractUrlFromContext(bot);
       
       if (!url) {
@@ -37,13 +35,11 @@ export class AudioDownloadPlugin {
         return;
       }
 
-      // Validar URL
       if (!this.#isValidUrl(url)) {
         await bot.reply('🔗 URL inválida. Envie um link de vídeo (YouTube, Twitter, Instagram, etc.)');
         return;
       }
 
-      // Verificar se é URL de vídeo suportada
       if (!isVideoUrl(url)) {
         await bot.reply('❌ Esta URL não é de uma plataforma de vídeo suportada.\n\n' +
                        '📌 Plataformas suportadas:\n' +
@@ -52,13 +48,11 @@ export class AudioDownloadPlugin {
         return;
       }
 
-      // Verificar limite diário (opcional)
       const canDownload = await this.#checkDailyLimit(bot);
       if (!canDownload) {
         return;
       }
 
-      // Iniciar download
       await this.#downloadAndSendAudio(bot, url, command);
       
     } catch (error) {
@@ -67,9 +61,6 @@ export class AudioDownloadPlugin {
     }
   }
 
-  /**
-   * Extrai URL de múltiplas fontes (mensagem, citação, etc.)
-   */
   #extractUrlFromContext(bot) {
     const sources = [
       bot.body,
@@ -88,9 +79,6 @@ export class AudioDownloadPlugin {
     return null;
   }
 
-  /**
-   * Valida se a URL é válida
-   */
   #isValidUrl(url) {
     try {
       const parsed = new URL(url);
@@ -100,16 +88,13 @@ export class AudioDownloadPlugin {
     }
   }
 
-  /**
-   * Verifica limite diário de downloads
-   */
   async #checkDailyLimit(bot) {
     const userId = bot.sender;
     const today = new Date().toISOString().split('T')[0];
     const key = `audio_downloads:${userId}:${today}`;
     
     const count = DatabaseService.getTempMetric(key) || 0;
-    const dailyLimit = 10; // Limite de 10 áudios por dia
+    const dailyLimit = 10;
     
     if (count >= dailyLimit) {
       await bot.reply(`⏰ **Limite diário atingido!**\n\n` +
@@ -122,22 +107,17 @@ export class AudioDownloadPlugin {
     return true;
   }
 
-  /**
-   * Baixa e envia o áudio
-   */
   async #downloadAndSendAudio(bot, url, command) {
     let filePath = null;
-    let tempDir = null;
 
     try {
-      // Feedback inicial
-      const emoji = COMMAND_EMOJIS[command] || '🎵';
+      // ✅ CORRIGIDO: usa EMOJIS local
+      const emoji = EMOJIS[command] || '🎵';
       await bot.react("⏳");
       await bot.reply(`${emoji} Baixando áudio... Isso pode levar alguns segundos.`);
 
       Logger.info(`🎵 Iniciando download de áudio: ${url}`);
 
-      // Buscar informações do vídeo primeiro (para mostrar progresso)
       const videoInfo = await VideoDownloader.getVideoInfo(url);
       
       if (videoInfo && videoInfo.duration > 0) {
@@ -151,7 +131,6 @@ export class AudioDownloadPlugin {
           return;
         }
         
-        // Mostrar informações do vídeo
         let infoMsg = `📥 **Baixando:** ${videoInfo.title || 'Vídeo'}\n`;
         infoMsg += `⏱️ **Duração:** ${minutes}m${seconds}s\n`;
         if (videoInfo.uploader) {
@@ -160,23 +139,19 @@ export class AudioDownloadPlugin {
         await bot.reply(infoMsg);
       }
 
-      // Baixar áudio com opções melhoradas
       const result = await VideoDownloader.downloadAudio(url, {
         format: 'mp3',
-        quality: '0', // Melhor qualidade
-        timeout: 60000 // 60 segundos
+        quality: '0',
+        timeout: 60000
       });
 
       filePath = result.filePath;
       const { title, duration, sizeMB } = result;
 
-      // Sanitizar nome do arquivo
       const fileName = this.#sanitizeFileName(title || 'audio');
-
-      // Ler e enviar áudio
       const audioBuffer = await fs.readFile(filePath);
       
-      // Construir caption com metadados
+      // ✅ CORRIGIDO: usa EMOJIS local
       const caption = this.#buildCaption(title, duration, sizeMB, command);
 
       await bot.sendMessage(bot.jid, {
@@ -184,10 +159,9 @@ export class AudioDownloadPlugin {
         mimetype: "audio/mpeg",
         fileName: fileName,
         caption: caption,
-        ptt: false // Áudio normal (não nota de voz)
+        ptt: false
       });
 
-      // Atualizar métricas
       await this.#updateMetrics(bot, result);
       
       Logger.info(`✅ Áudio enviado com sucesso: ${fileName}`);
@@ -198,14 +172,10 @@ export class AudioDownloadPlugin {
       throw error;
       
     } finally {
-      // Limpeza segura
       await this.#cleanupFiles(filePath);
     }
   }
 
-  /**
-   * Sanitiza o nome do arquivo
-   */
   #sanitizeFileName(title) {
     if (!title) return 'audio.mp3';
     
@@ -218,11 +188,9 @@ export class AudioDownloadPlugin {
     return `${sanitized}.mp3`;
   }
 
-  /**
-   * Constrói a caption com metadados do áudio
-   */
+  // ✅ CORRIGIDO: usa EMOJIS local
   #buildCaption(title, duration, sizeMB, command) {
-    const emoji = COMMAND_EMOJIS[command] || '🎵';
+    const emoji = EMOJIS[command] || '🎵';
     let caption = `${emoji} **Áudio baixado com sucesso!**\n\n`;
     
     if (title) {
@@ -244,21 +212,14 @@ export class AudioDownloadPlugin {
     return caption;
   }
 
-  /**
-   * Atualiza métricas no banco de dados
-   */
   async #updateMetrics(bot, result) {
     try {
       const userId = bot.sender;
       
-      // Métricas globais
       DatabaseService.incrementMetric("audios_downloaded");
       DatabaseService.incrementMetric("total_messages");
-      
-      // Métricas por usuário (usando o novo método)
       DatabaseService.incrementAudioDownload(userId);
       
-      // Métricas detalhadas
       if (result.duration) {
         DatabaseService.updateMetric("total_audio_duration", result.duration);
       }
@@ -266,7 +227,6 @@ export class AudioDownloadPlugin {
         DatabaseService.updateMetric("total_audio_size", result.size);
       }
       
-      // Atualizar limite diário
       const today = new Date().toISOString().split('T')[0];
       const key = `audio_downloads:${userId}:${today}`;
       const current = DatabaseService.getTempMetric(key) || 0;
@@ -279,11 +239,9 @@ export class AudioDownloadPlugin {
     }
   }
 
-  /**
-   * Mostra ajuda específica para o comando
-   */
+  // ✅ CORRIGIDO: usa EMOJIS local
   async #showHelp(bot, command) {
-    const emoji = COMMAND_EMOJIS[command] || '🎵';
+    const emoji = EMOJIS[command] || '🎵';
     
     const helpMessage = `${emoji} **Como baixar áudio/música:**\n\n` +
                        `📌 **Uso:** \`${command} [link]\`\n\n` +
@@ -304,9 +262,6 @@ export class AudioDownloadPlugin {
     await bot.reply(helpMessage);
   }
 
-  /**
-   * Tratamento de erros
-   */
   async #handleError(bot, error) {
     const errorMessages = {
       'yt-dlp': '⚠️ **yt-dlp não encontrado**\n\n' +
@@ -362,9 +317,6 @@ export class AudioDownloadPlugin {
     await bot.react("❌");
   }
 
-  /**
-   * Limpa arquivos temporários
-   */
   async #cleanupFiles(filePath) {
     try {
       if (filePath) {
