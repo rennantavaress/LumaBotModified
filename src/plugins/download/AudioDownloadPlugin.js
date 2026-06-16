@@ -6,6 +6,16 @@ import { Logger } from "../../utils/Logger.js";
 import fs from "fs/promises";
 import path from "path";
 
+// No início do arquivo, depois dos imports
+const EMOJIS = {
+  "!musica": "🎵",
+  "!music": "🎵",
+  "!song": "🎶",
+  "!track": "🎧",
+  "!audio": "🎙️",
+  "!a": "🎙️",
+};
+
 export class AudioDownloadPlugin {
   // ✅ Adicionar novos aliases musicais
   static commands = [
