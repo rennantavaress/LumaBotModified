@@ -44,10 +44,20 @@ export const COMMANDS = ConfigStore.apply("COMMANDS", {
   HELP: "!help",
   PERSONA: "!persona",
   EVERYONE: "@everyone",
+  EVERYONE_ALT: "@todos",
   DOWNLOAD_SHORT: "!d",
   DOWNLOAD: "!download",
+  
+  // 🆕 NOVOS COMANDOS DE ÁUDIO/MÚSICA
+  MUSIC: "!musica",
+  MUSIC_EN: "!music",
+  SONG: "!song",
+  TRACK: "!track",
+  
+  // Mantidos por compatibilidade
   AUDIO_DOWNLOAD: "!audio",
   AUDIO_DOWNLOAD_SHORT: "!a",
+  
   LUMA_STATS: "!luma stats",
   LUMA_STATS_SHORT: "!ls",
   LUMA_CLEAR: "!luma clear",
@@ -71,6 +81,12 @@ export const MENUS = ConfigStore.apply("MENUS", {
     "• *!image* (!i) - Sticker -> Imagem\n" +
     "• *!pdf* - Imagem -> PDF\n" +
     "• *!mergepdf* - Adiciona PDFs; finalize com !mergepdf done nome\n\n" +
+    "🎵 *ÁUDIO E MÚSICA* 🎵\n" +
+    "• *!musica* - Baixa música de qualquer link (recomendado)\n" +
+    "• *!music* - Baixa música (versão em inglês)\n" +
+    "• *!song* - Baixa música (em inglês)\n" +
+    "• *!track* - Baixa faixa de áudio\n" +
+    "• *!audio* (!a) - Baixa áudio (compatibilidade)\n\n" +
     "🧠 *INTELIGÊNCIA ARTIFICIAL*\n" +
     "• *Luma* - Fale qualquer coisa (ex: 'Luma, bom dia')\n" +
     "• *!persona* - Abre o menu para mudar a Luma\n" +
@@ -84,7 +100,6 @@ export const MENUS = ConfigStore.apply("MENUS", {
     "• *!lembrete* (ou peça à Luma) - Agenda um lembrete com menção\n\n" +
     "🛠️ *UTILITÁRIOS*\n" +
     "• *!download* (!d) - Baixa vídeo do Twitter/X ou Instagram\n" +
-    "• *!audio* (!a) - Baixa somente o áudio (MP3) de qualquer link\n" +
     "• *!meunumero* - Vê seu ID/Número\n" +
     "• *!resumo* (ex: !resumo 30) - Resume as últimas mensagens da conversa\n" +
     "• *!help* - Mostra essa lista\n" +
@@ -136,12 +151,32 @@ export const MESSAGES = ConfigStore.apply("MESSAGES", {
   VIDEO_NO_URL:
     "ℹ️ Cole o link do vídeo junto com o comando.\nEx: `!download https://x.com/...`",
   AUDIO_NO_URL:
-    "ℹ️ Cole o link junto com o comando.\nEx: `!audio https://youtu.be/...`",
-  AUDIO_SENT: "🎵 Pronto!",
+    "🎵 **Nenhum link encontrado!**\n\n" +
+    "**Uso:** `!musica [link]`\n" +
+    "**Aliases:** !music, !song, !track, !audio, !a\n\n" +
+    "**Exemplos:**\n" +
+    "`!musica https://youtube.com/watch?v=abc123`\n" +
+    "`!song https://youtu.be/abc123`\n" +
+    "`!track https://soundcloud.com/track`\n\n" +
+    "💡 Responda a uma mensagem com link ou cole direto.",
+  AUDIO_SENT: "🎵 Áudio baixado com sucesso!",
   AUDIO_DOWNLOAD_ERROR:
-    "❌ Não consegui baixar o áudio. O conteúdo pode ser privado ou a URL inválida.",
+    "❌ **Erro ao baixar áudio**\n\n" +
+    "🔄 Tente novamente ou use outro link.\n" +
+    "💡 Dica: Use links do YouTube, Vimeo, SoundCloud.\n\n" +
+    "**Comandos disponíveis:**\n" +
+    "• `!musica` (recomendado em PT-BR)\n" +
+    "• `!music` (internacional)\n" +
+    "• `!song` (música em inglês)\n" +
+    "• `!track` (faixa de áudio)\n" +
+    "• `!audio` (compatibilidade)",
   YTDLP_NOT_FOUND:
-    "❌ Não foi possível baixar o yt-dlp. Verifique sua conexão e tente novamente.",
+    "⚠️ **yt-dlp não encontrado**\n\n" +
+    "📌 Para instalar, use um dos comandos:\n" +
+    "• `npm install -g yt-dlp`\n" +
+    "• `pip install yt-dlp`\n" +
+    "• `sudo apt install yt-dlp` (Ubuntu/Debian)\n\n" +
+    "🔄 Após instalar, reinicie o bot.",
   REPLY_IMAGE_PDF:
     "ℹ️ Envie uma imagem com !pdf ou responda a uma imagem com !pdf nome do arquivo",
   PDF_MERGE_USAGE:
@@ -150,4 +185,36 @@ export const MESSAGES = ConfigStore.apply("MESSAGES", {
   PDF_MERGE_ADDED: "📎 PDF adicionado",
   PDF_MERGE_CLEARED: "🗑️ Lista de PDFs limpa.",
   PDF_MERGE_ERROR: "❌ Não consegui juntar esses PDFs.",
+});
+
+// 🆕 NOVO: Emojis por comando
+export const COMMAND_EMOJIS = ConfigStore.apply("COMMAND_EMOJIS", {
+  "!musica": "🎵",
+  "!music": "🎵",
+  "!song": "🎶",
+  "!track": "🎧",
+  "!audio": "🎙️",
+  "!a": "🎙️",
+  "!download": "📥",
+  "!d": "📥",
+});
+
+// 🆕 NOVO: Mapeamento de aliases
+export const COMMAND_ALIASES = ConfigStore.apply("COMMAND_ALIASES", {
+  "!musica": "!audio",
+  "!music": "!audio",
+  "!song": "!audio",
+  "!track": "!audio",
+  "!audio": "!audio",
+  "!a": "!audio",
+});
+
+// 🆕 NOVO: Descrições para help dinâmico
+export const COMMAND_DESCRIPTIONS = ConfigStore.apply("COMMAND_DESCRIPTIONS", {
+  "!musica": "Baixa música de qualquer link (recomendado)",
+  "!music": "Baixa música (versão em inglês)",
+  "!song": "Baixa música (em inglês)",
+  "!track": "Baixa faixa de áudio",
+  "!audio": "Baixa áudio (compatibilidade)",
+  "!a": "Baixa áudio (atalho)",
 });
