@@ -3,6 +3,7 @@ import { BaileysAdapter } from '../adapters/BaileysAdapter.js';
 import { MessageHandler } from '../handlers/MessageHandler.js';
 import { JidQueue } from './JidQueue.js';
 import { UserResolver } from '../core/services/UserResolver.js';
+import { isSentByBot } from './SentMessageCache.js';
 
 /**
  * Enriquece os perfis de usuário a partir da mensagem recebida: o remetente
@@ -39,18 +40,37 @@ function cleanJid(jid) {
   return jid?.split(':')[0].split('@')[0].replace(/\D/g, '') || null;
 }
 
-function isOwnPrivateChat(sock, botAdapter) {
-  if (botAdapter.isGroup) return false;
+/**
+ * Retorna true se o remetente da mensagem É o próprio bot,
+ * verificando tanto fromMe quanto comparação direta de JID/LID.
+ * Necessário porque em grupos o Baileys às vezes entrega mensagens
+ * do bot com fromMe = false.
+ */
+function isBotSelf(sock, botAdapter) {
+  if (botAdapter.isFromMe) return true;
 
-  const chatId = cleanJid(botAdapter.jid);
-  const ownIds = [
+  const senderClean = cleanJid(botAdapter.senderJid);
+  if (!senderClean) return false;
+
+  const rawCandidates = [
     sock.user?.id,
     sock.user?.lid,
     sock.authState?.creds?.me?.id,
     sock.authState?.creds?.me?.lid,
-  ].map(cleanJid).filter(Boolean);
+  ];
+  const candidates = rawCandidates.map(cleanJid).filter(Boolean);
 
-  return !!chatId && ownIds.includes(chatId);
+  const match = candidates.includes(senderClean);
+
+  // Log temporário para diagnóstico — remover após confirmação
+  if (!match) {
+    Logger.warn(
+      `[isBotSelf] fromMe=${botAdapter.isFromMe} sender=${botAdapter.senderJid}` +
+      ` senderClean=${senderClean} candidates=${JSON.stringify(rawCandidates)}`
+    );
+  }
+
+  return match;
 }
 
 function isRateLimited(jid) {
@@ -104,7 +124,7 @@ export async function routeMessages(sock, m) {
       if (!message.message) continue;
       const botAdapter = new BaileysAdapter(sock, message);
 
-      if (botAdapter.isFromMe || isOwnPrivateChat(sock, botAdapter)) {
+      if (isBotSelf(sock, botAdapter) || isSentByBot(botAdapter.jid, botAdapter.body)) {
         continue;
       }
 

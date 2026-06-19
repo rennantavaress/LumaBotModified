@@ -20,6 +20,9 @@ export class LumaPlugin {
     COMMANDS.PERSONA,
   ];
 
+  /** @type {Map<string, boolean>} jid → menu de persona está aguardando resposta */
+  #pendingPersonaMenu = new Map();
+
   /** @type {Map<string, Array<{name:string, text:string}>>} jid → últimas mensagens do grupo */
   #groupBuffer = new Map();
 
@@ -65,20 +68,33 @@ export class LumaPlugin {
   // ---------------------------------------------------------------------------
 
   async onMessage(bot) {
-    // Mantém buffer de contexto do grupo
-    if (bot.isGroup && !bot.isFromMe && bot.body) {
+    // Ignora QUALQUER mensagem enviada pelo próprio bot —
+    // inclui respostas de comandos, menus, stats, etc.
+    if (bot.isFromMe) return;
+
+    // Ignora mensagens de sistema (sem remetente real em grupos)
+    if (bot.isGroup && !bot.senderJid) return;
+
+    // Mantém buffer de contexto do grupo (nunca adiciona mensagens do próprio bot)
+    if (bot.isGroup && bot.body && !bot.isFromMe) {
       this.#addToGroupBuffer(bot.jid, bot.body, bot.senderName);
     }
 
     // Resposta ao menu de personalidade (ex: o usuário responde "p1")
     if (bot.body && await this.#handleMenuReply(bot)) return;
 
+    // trecho de src/plugins/luma/LumaPlugin.js — método onMessage()
+// OPÇÃO A: exige trigger/menção/reply mesmo em DM (recomendado se o bot
+// roda no SEU número pessoal, e não num número dedicado só pra Luma).
+
     const isPrivate    = !bot.isGroup;
     const isReplyToBot = bot.isRepliedToMe;
     const isTriggered  = bot.body && LumaHandler.isTriggered(bot.body);
     const isMentioned  = bot.isMentioned;
 
-    if (!isPrivate && !isReplyToBot && !isTriggered && !isMentioned) return;
+    // ANTES: if (!isPrivate && !isReplyToBot && !isTriggered && !isMentioned) return;
+    // AGORA: remove o bypass automático de DM — exige reply/trigger/menção sempre.
+    if (!isReplyToBot && !isTriggered && !isMentioned) return;
 
     // Conta a interação com a Luma para o ranking (global + por grupo).
     // '_pv_' agrupa as conversas privadas no ranking global.
@@ -116,16 +132,29 @@ export class LumaPlugin {
   }
 
   async #handleMenuReply(bot) {
-    const quotedText = bot.quotedText;
-    if (!quotedText?.includes(MENUS.PERSONALITY.HEADER.split("\n")[0])) return false;
+    const quotedText   = bot.quotedText;
+    const menuPending  = this.#pendingPersonaMenu.get(bot.jid);
+    const bodyTrimmed  = (bot.body || '').trim().toLowerCase();
+
+    // Detecta "p1", "p2" … com ou sem quote do menu
+    const isPersonaCode = /^p\d+$/.test(bodyTrimmed);
+
+    const isMenuReply =
+      isPersonaCode && (
+        menuPending ||
+        quotedText?.includes(MENUS.PERSONALITY.HEADER.split("\n")[0])
+      );
+
+    if (!isMenuReply) return false;
 
     const list  = PersonalityManager.getList();
-    const num   = parseInt(bot.body.trim().toLowerCase().replace("p", ""));
+    const num   = parseInt(bodyTrimmed.replace("p", ""));
     const index = !isNaN(num) && num > 0 ? num - 1 : -1;
 
     if (index >= 0 && index < list.length) {
       PersonalityManager.setPersonality(bot.jid, list[index].key);
       await bot.reply(`${MENUS.MSGS.PERSONA_CHANGED}*${list[index].name}*`);
+      this.#pendingPersonaMenu.delete(bot.jid);
     } else {
       await bot.reply(MENUS.MSGS.INVALID_OPT);
     }
@@ -136,17 +165,39 @@ export class LumaPlugin {
     const dbStats  = DatabaseService.getMetrics();
     const memStats = this.lumaHandler.getStats?.() ?? { totalConversations: 0 };
 
+    // Inclui top 3 do grupo (ou global em PV) para enriquecer as stats
+    let rankText = '';
+    try {
+      const ranking = bot.isGroup
+        ? DatabaseService.getGroupRanking(bot.jid, 3)
+        : DatabaseService.getGlobalRanking(3);
+
+      if (ranking && ranking.length > 0) {
+        const medals = ['🥇', '🥈', '🥉'];
+        rankText = '\n\n🏆 *Quem mais fala comigo' + (bot.isGroup ? ' aqui' : '') + ':*\n';
+        ranking.forEach((row, i) => {
+          const name = row.push_name || row.notify_name || row.sender_jid?.split('@')[0] || 'Alguém';
+          rankText += `${medals[i] || '•'} ${name} — ${row.count} vez${row.count !== 1 ? 'es' : ''}\n`;
+        });
+      }
+    } catch (_) { /* silently ignore ranking errors */ }
+
+    const hasAnyData = Object.keys(dbStats).length > 0;
+    const statusNote = hasAnyData ? '' : '\n\n_ℹ️ Contadores começam do zero a cada reinício do banco._';
+
     const text =
-      `📊 *Estatísticas Globais da Luma*\n\n` +
+      `📊 *Estatísticas da Luma*\n\n` +
       `🧠 *Inteligência Artificial:*\n` +
-      `• Respostas Geradas: ${dbStats.ai_responses || 0}\n` +
-      `• Conversas Ativas (RAM): ${memStats.totalConversations}\n\n` +
-      `🎨 *Mídia Gerada:*\n` +
+      `• Respostas geradas: ${dbStats.ai_responses || 0}\n` +
+      `• Conversas ativas (memória): ${memStats.totalConversations}\n\n` +
+      `🎨 *Mídia criada:*\n` +
       `• Figurinhas: ${dbStats.stickers_created || 0}\n` +
       `• Imagens: ${dbStats.images_created || 0}\n` +
       `• GIFs: ${dbStats.gifs_created || 0}\n` +
-      `• Vídeos Baixados: ${dbStats.videos_downloaded || 0}\n\n` +
-      `📈 *Total de Interações:* ${dbStats.total_messages || 0}`;
+      `• Vídeos baixados: ${dbStats.videos_downloaded || 0}\n\n` +
+      `📈 *Total de mensagens:* ${dbStats.total_messages || 0}` +
+      rankText +
+      statusNote;
 
     await bot.sendText(text);
   }
@@ -165,5 +216,8 @@ export class LumaPlugin {
 
     text += MENUS.PERSONALITY.FOOTER;
     await bot.sendText(text);
+
+    // Marca que estamos aguardando resposta de código (p1, p2…) neste chat
+    this.#pendingPersonaMenu.set(bot.jid, true);
   }
 }

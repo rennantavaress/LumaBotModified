@@ -3,10 +3,12 @@ import { GroupManager } from "../managers/GroupManager.js";
 import { MediaProcessor } from "./MediaProcessor.js";
 import { DatabaseService } from "../services/Database.js";
 import { PersonalityManager } from "../managers/PersonalityManager.js";
+import fs from "fs";
 import { MENUS } from "../config/constants.js";
 import { LUMA_CONFIG } from "../config/lumaConfig.js";
 import { ReminderService } from "../core/services/ReminderService.js";
 import { RankPlugin } from "../plugins/luma/RankPlugin.js";
+import { VideoDownloader } from "../services/VideoDownloader.js";
 import { UserPlugin } from "../plugins/user/UserPlugin.js";
 
 /**
@@ -14,6 +16,46 @@ import { UserPlugin } from "../plugins/user/UserPlugin.js";
  * Recebe as chamadas de função (tool calls) do Gemini e as executa.
  */
 export class ToolDispatcher {
+    static async handleClearHistory(bot, lumaHandler) {
+
+    const msg = (bot.body || "").toLowerCase();
+
+    const clearPatterns = [
+        "limpa a memória",
+        "apaga a memória",
+        "esquece tudo",
+        "zera o histórico",
+        "apaga o histórico",
+        "limpar memória",
+        "esquecer conversa"
+    ];
+
+    const shouldClear = clearPatterns.some(p =>
+        msg.includes(p)
+    );
+
+    if (!shouldClear) {
+        Logger.warn(
+            "⚠️ clear_history bloqueado: usuário não pediu explicitamente."
+        );
+        return;
+    }
+
+    const historyKey =
+        bot.isGroup
+            ? `${bot.jid}:${bot.senderJid}`
+            : bot.jid;
+
+    lumaHandler.clearHistory(historyKey);
+    lumaHandler.clearGroupBuffer?.(bot.jid);
+
+    await bot.reply(
+        "🗑️ Minha memória para essa conversa foi apagada."
+    );
+}
+   static async handleDownloadAudio(bot, args) {
+    await bot.reply("✅ A tool download_audio foi chamada!");
+}
     static async handleToolCalls(bot, toolCalls, lumaHandler, quotedBot = null) {
         if (!toolCalls || toolCalls.length === 0) return;
 
@@ -21,6 +63,12 @@ export class ToolDispatcher {
             Logger.info(`🔧 Luma acionou a ferramenta: ${call.name}`);
             try {
                 switch (call.name) {
+                    case "download_audio":
+                    await this.handleDownloadAudio(bot, call.args);
+                    break;
+                    case "download_video":
+                        await this.handleDownloadVideo(bot, call.args);
+                        break;
                     case "tag_everyone":
                         await this.handleTagEveryone(bot);
                         break;
@@ -50,6 +98,9 @@ export class ToolDispatcher {
                         break;
                     case "show_personality_menu":
                         await this.handleShowPersonalityMenu(bot);
+                        break;
+                    case "show_luma_stats":
+                        await this.handleShowStats(bot, lumaHandler);
                         break;
                     case "show_rank":
                         await this.handleShowRank(bot, call.args);
@@ -237,11 +288,6 @@ export class ToolDispatcher {
         await bot.reply("⚠️ Você precisa responder a uma figurinha animada para eu transformar em GIF!");
     }
 
-    static async handleClearHistory(bot, lumaHandler) {
-        lumaHandler.clearHistory(bot.jid);
-        await bot.reply("🗑️ Minha memória para essa conversa foi apagada. O que estávamos falando mesmo?");
-    }
-
     /** Muda a personalidade da Luma neste chat via linguagem natural. */
     static async handleChangePersonality(bot, args) {
         const key = args?.personality;
@@ -396,6 +442,25 @@ export class ToolDispatcher {
             Logger.error("Erro ao agendar lembrete:", error);
             await bot.reply(`⚠️ Não consegui agendar: ${error.message}`);
         }
+    }
+
+    static async handleShowStats(bot, lumaHandler) {
+        const dbStats  = DatabaseService.getMetrics();
+        const memStats = lumaHandler?.getStats?.() ?? { totalConversations: 0 };
+
+        const text =
+            `📊 *Estat\u00edsticas Globais da Luma*\n\n` +
+            `🧠 *Intelig\u00eancia Artificial:*\n` +
+            `\u2022 Respostas Geradas: ${dbStats.ai_responses || 0}\n` +
+            `\u2022 Conversas Ativas (RAM): ${memStats.totalConversations}\n\n` +
+            `🎨 *M\u00eddia Gerada:*\n` +
+            `\u2022 Figurinhas: ${dbStats.stickers_created || 0}\n` +
+            `\u2022 Imagens: ${dbStats.images_created || 0}\n` +
+            `\u2022 GIFs: ${dbStats.gifs_created || 0}\n` +
+            `\u2022 V\u00eddeos Baixados: ${dbStats.videos_downloaded || 0}\n\n` +
+            `📈 *Total de Intera\u00e7\u00f5es:* ${dbStats.total_messages || 0}`;
+
+        await bot.sendText(text);
     }
 
     static async handleShowPersonalityMenu(bot) {

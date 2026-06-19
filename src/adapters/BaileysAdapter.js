@@ -1,5 +1,6 @@
 import { Logger } from "../utils/Logger.js";
 import { MessagingPort } from "../core/ports/MessagingPort.js";
+import { trackSentMessage } from "../infra/SentMessageCache.js";
 
 /**
  * Implementação do MessagingPort para o Baileys (WhatsApp Web via engenharia reversa).
@@ -285,6 +286,9 @@ export class BaileysAdapter extends MessagingPort {
   // --- Métodos de Envio ---
 
   async sendText(text, options = {}) {
+    // Registra o fingerprint antes de enviar para filtrar o eco do Baileys
+    trackSentMessage(this.remoteJid, text);
+
     const payload = { text };
     if (options.mentions?.length) payload.mentions = options.mentions;
     if (options.quoted) {

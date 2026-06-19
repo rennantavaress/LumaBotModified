@@ -23,6 +23,8 @@ import dotenv from 'dotenv';
 // override:true garante que o .env do bot prevalece sobre env herdado do processo
 // pai (dashboard), evitando que uma chave antiga em memória contamine o bot.
 dotenv.config({ override: true });
+console.log("AI_PROVIDER =", process.env.AI_PROVIDER);
+console.log("GEMINI_API_KEY =", process.env.GEMINI_API_KEY);
 
 // ─── Aviso de configuração de IA ──────────────────────────────────────────────
 

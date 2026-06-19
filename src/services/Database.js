@@ -221,9 +221,15 @@ export class DatabaseService {
   /** Ranking de um chat específico, ordenado por interações. */
   static getGroupRanking(groupJid, limit = 10) {
     return dbPrivate.prepare(`
-      SELECT sender_jid, count, last_at FROM luma_interactions
-      WHERE group_jid = ?
-      ORDER BY count DESC
+      SELECT
+        li.sender_jid,
+        li.count,
+        li.last_at,
+        COALESCE(u.bot_nickname, u.contact_name, u.push_name, u.notify_name) AS push_name
+      FROM luma_interactions li
+      LEFT JOIN wa_users u ON u.jid = li.sender_jid
+      WHERE li.group_jid = ?
+      ORDER BY li.count DESC
       LIMIT ?
     `).all(groupJid, limit);
   }
@@ -231,9 +237,14 @@ export class DatabaseService {
   /** Ranking global agregado por usuário (soma de todos os chats). */
   static getGlobalRanking(limit = 10) {
     return dbPrivate.prepare(`
-      SELECT sender_jid, SUM(count) AS count, MAX(last_at) AS last_at
-      FROM luma_interactions
-      GROUP BY sender_jid
+      SELECT
+        li.sender_jid,
+        SUM(li.count) AS count,
+        MAX(li.last_at) AS last_at,
+        COALESCE(u.bot_nickname, u.contact_name, u.push_name, u.notify_name) AS push_name
+      FROM luma_interactions li
+      LEFT JOIN wa_users u ON u.jid = li.sender_jid
+      GROUP BY li.sender_jid
       ORDER BY count DESC
       LIMIT ?
     `).all(limit);

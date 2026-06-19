@@ -67,11 +67,13 @@ export class MessageHandler {
     SpontaneousHandler.trackActivity(bot.jid);
   }
 
+  const url = extractUrl(bot.body);
   const command = CommandRouter.detect(bot.body, {
     hasStickerSource:
       bot.hasVisualContent ||
       bot.quotedHasVisualContent ||
-      !!extractUrl(bot.body),
+      !!url,
+    hasUrl: !!url,
   });
 
   console.log("================================");

@@ -27,12 +27,17 @@ export class CommandRouter {
 
     if (lower === COMMANDS.MY_NUMBER)              return COMMANDS.MY_NUMBER;
 
+    // CORREÇÃO: !lc e !clear agora retornam o mesmo comando que !luma clear
     if (lower === COMMANDS.LUMA_CLEAR_SHORT)       return COMMANDS.LUMA_CLEAR;
     if (lower.includes(COMMANDS.LUMA_CLEAR))       return COMMANDS.LUMA_CLEAR;
-    if (lower.includes(COMMANDS.LUMA_CLEAR_ALT))   return COMMANDS.LUMA_CLEAR_ALT;
+    if (lower.includes(COMMANDS.LUMA_CLEAR_ALT))   return COMMANDS.LUMA_CLEAR;  // era LUMA_CLEAR_ALT
 
     if (lower.includes(COMMANDS.LUMA_STATS))       return COMMANDS.LUMA_STATS;
-    if (lower.includes(COMMANDS.LUMA_STATS_SHORT)) return COMMANDS.LUMA_STATS;
+    // CORREÇÃO: !ls usa === ou startsWith para evitar falsos positivos com includes
+    if (
+      lower === COMMANDS.LUMA_STATS_SHORT ||
+      lower.startsWith(COMMANDS.LUMA_STATS_SHORT + " ")
+    )                                              return COMMANDS.LUMA_STATS;
 
     if (lower.includes(COMMANDS.STICKER))          return COMMANDS.STICKER;
     if (lower.includes(COMMANDS.STICKER_SHORT))    return COMMANDS.STICKER;
@@ -182,49 +187,52 @@ export class CommandRouter {
 
 
   /**
- * Detecta pedidos para alterar a personalidade da Luma.
- */
-static isContextualPersonaRequest(text) {
-  if (!text) return false;
+   * Detecta pedidos para alterar a personalidade da Luma.
+   * CORREÇÃO: Expandido para cobrir mais variações naturais como
+   * "Luma, vira outra personalidade", "seja diferente", "muda de modo", etc.
+   */
+  static isContextualPersonaRequest(text) {
+    if (!text) return false;
 
-  const normalized = text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+    const normalized = text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
 
-  return /\b(muda|mude|mudar|troca|troque|trocar|altera|altere|alterar)\b.*\b(personalidade|persona|jeito|estilo)\b/
-    .test(normalized);
-}
-
-
-  /**
- * Detecta pedidos para limpar a memória da conversa.
- */
-static isContextualClearRequest(text) {
-  if (!text) return false;
-
-  const normalized = text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
-  return /\b(esqueca|apaga|apague|limpa|limpe|limpar|zera|zere|zerar)\b.*\b(conversa|memoria|historico)\b/
-    .test(normalized);
-}
+    return /\b(muda|mude|mudar|troca|troque|trocar|altera|altere|alterar|vira|vire|virar|se?ja|ser)\b.*\b(personalidade|persona|jeito|estilo|modo|comportamento)\b/
+      .test(normalized);
+  }
 
 
   /**
- * Detecta pedidos para mostrar estatísticas da Luma.
- */
-static isContextualStatsRequest(text) {
-  if (!text) return false;
+   * Detecta pedidos para limpar a memória da conversa.
+   */
+  static isContextualClearRequest(text) {
+    if (!text) return false;
 
-  const normalized = text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+    const normalized = text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
 
-  return /\b(mostra|mostre|mostrar|ver|veja|quais sao)\b.*\b(estatisticas|dados|metricas|desempenho)\b/
-    .test(normalized);
+    return /\b(esqueca|apaga|apague|limpa|limpe|limpar|zera|zere|zerar|reseta|resete|resetar|apaga|apague)\b.*\b(conversa|memoria|historico|chat|contexto)\b/
+      .test(normalized);
+  }
+
+
+  /**
+   * Detecta pedidos para mostrar estatísticas da Luma.
+   * CORREÇÃO: Expandido para cobrir "quero ver os dados", "me mostra as stats", etc.
+   */
+  static isContextualStatsRequest(text) {
+    if (!text) return false;
+
+    const normalized = text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    return /\b(mostra|mostre|mostrar|ver|veja|exibe|exibir|quero|me\s+d[aê]|quais\s+s[aã]o)\b.*\b(estatisticas|stats|dados|metricas|desempenho|numeros|numeros)\b/
+      .test(normalized);
   }
 }

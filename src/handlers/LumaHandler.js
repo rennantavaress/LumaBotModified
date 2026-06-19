@@ -72,17 +72,23 @@ export class LumaHandler {
       });
 
       const response       = await this.aiService.generateContent(promptParts);
+      const toolCalls       = response.functionCalls || [];
       const cleanedResponse = cleanResponseText(response.text);
 
-      if (cleanedResponse) {
-        this.history.add(hKey, userMessage, cleanedResponse, senderName);
+      // Quando há tool calls, ignoramos o texto acompanhante:
+      // a IA muitas vezes manda uma "explicação" junto da ação, o que gera
+      // mensagens duplas indesejadas. A ferramenta é suficiente.
+      const textToSave = toolCalls.length > 0 ? '' : cleanedResponse;
+
+      if (textToSave) {
+        this.history.add(hKey, userMessage, textToSave, senderName);
         this._updateMetrics(userJid);
       }
 
       return {
-        text:      cleanedResponse,
-        parts:     splitIntoParts(cleanedResponse),
-        toolCalls: response.functionCalls || [],
+        text:      textToSave,
+        parts:     splitIntoParts(textToSave),
+        toolCalls,
       };
     } catch (error) {
       Logger.error('❌ Erro no fluxo Luma:', error);
@@ -237,6 +243,15 @@ export class LumaHandler {
     this.history.clear(userJid);
   }
 
+  /**
+   * Callback opcional para limpar o groupBuffer do LumaPlugin.
+   * É sobrescrito pelo LumaPlugin após a instanciação.
+   * @param {string} _jid
+   */
+  clearGroupBuffer(_jid) {
+    // Por padrão não faz nada; LumaPlugin sobrescreve isso.
+  }
+
   getStats() {
     return {
       totalConversations: this.history.size,
@@ -262,11 +277,13 @@ export class LumaHandler {
   }
 
   async _dispatchResponse(bot, response, quotedBot) {
-    if (response.parts?.length > 0) {
+    const hasTools = response.toolCalls?.length > 0;
+    // Se há tool calls, suprime o texto da IA (evita "explicações" antes da ação)
+    if (response.parts?.length > 0 && !hasTools) {
       const lastSent = await this._sendParts(bot, response.parts);
       if (lastSent?.key?.id) this.saveLastBotMessage(bot.jid, lastSent.key.id);
     }
-    if (response.toolCalls?.length > 0) {
+    if (hasTools) {
       await ToolDispatcher.handleToolCalls(bot, response.toolCalls, this, quotedBot);
     }
   }
