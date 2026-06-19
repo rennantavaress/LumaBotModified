@@ -37,9 +37,6 @@ function buildAudioTranscriber() {
 function buildPluginManager() {
   const lumaHandler = new LumaHandler();
   const audioTranscriber = buildAudioTranscriber();
-  const resumoPlugin = new ResumoPlugin({ lumaHandler });
-  lumaHandler.setToolContext({ resumoPlugin });
-
   return new PluginManager()
     .register(new MediaPlugin())
     .register(new DownloadPlugin())
@@ -48,7 +45,7 @@ function buildPluginManager() {
     .register(new LumaPlugin({ lumaHandler, audioTranscriber }))
     .register(new SpontaneousPlugin({ lumaHandler }))
     .register(new UtilsPlugin())
-    .register(resumoPlugin)
+    .register(new ResumoPlugin({ lumaHandler }))
     .register(new UserPlugin())
     .register(new RankPlugin())
     .register(new ReminderPlugin());
@@ -63,27 +60,25 @@ export class MessageHandler {
   static get pluginManager() { return (this.#pm ??= buildPluginManager()); }
 
   static async process(bot) {
-  console.log("CHEGUEI NO MESSAGE HANDLER");
-  if (CONFIG.IGNORE_SELF && bot.isFromMe) return;
+    console.log("CHEGUEI NO MESSAGE HANDLER");
+    if (CONFIG.IGNORE_SELF && bot.isFromMe) return;
 
-  if (bot.isGroup && !bot.isFromMe) {
-    SpontaneousHandler.trackActivity(bot.jid);
-  }
+    if (bot.isGroup && !bot.isFromMe) {
+      SpontaneousHandler.trackActivity(bot.jid);
+    }
 
-  const url = extractUrl(bot.body);
-  const command = CommandRouter.detect(bot.body, {
-    hasStickerSource:
-      bot.hasVisualContent ||
-      bot.quotedHasVisualContent ||
-      !!url,
-    hasUrl: !!url,
-  });
+    const command = CommandRouter.detect(bot.body, {
+      hasStickerSource:
+        bot.hasVisualContent ||
+        bot.quotedHasVisualContent ||
+        !!extractUrl(bot.body),
+    });
 
-  console.log("================================");
-  console.log("Mensagem recebida:", bot.body);
-  console.log("Comando detectado:", command);
-  console.log("================================");
+    console.log("================================");
+    console.log("Mensagem recebida:", bot.body);
+    console.log("Comando detectado:", command);
+    console.log("================================");
 
-  await MessageHandler.pluginManager.dispatch(command, bot);
+    await MessageHandler.pluginManager.dispatch(command, bot);
   }
 }
