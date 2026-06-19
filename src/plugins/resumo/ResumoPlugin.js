@@ -43,14 +43,18 @@ export class ResumoPlugin {
   }
 
   async onCommand(_command, bot) {
+    await this.showSummary(bot);
+  }
+
+  async showSummary(bot, { limit = null } = {}) {
     if (!this._lumaHandler?.isConfigured) {
       await bot.reply('❌ IA não configurada para gerar resumo.');
       return;
     }
 
-    const limit = this._parseLimit(bot.body);
+    const parsedLimit = this._normalizeLimit(limit) ?? this._parseLimit(bot.body);
     const buf   = this.#buffers.get(bot.jid) ?? [];
-    const slice = buf.slice(-limit);
+    const slice = buf.slice(-parsedLimit);
 
     if (!slice.length) {
       await bot.reply('📭 Não tem conversa recente salva aqui ainda.');
@@ -79,8 +83,21 @@ export class ResumoPlugin {
 
   /** @private */
   _parseLimit(body) {
-    const match = body?.match(new RegExp(`${COMMANDS.RESUMO}\\s+(\\d+)`, 'i'));
+    const match =
+      body?.match(new RegExp(`${COMMANDS.RESUMO}\\s+(\\d+)`, 'i')) ||
+      body?.normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .match(/\b(?:ultimas?|ultimos?|resumo|resume|resuma|resumir)\s+(\d{1,3})\b/);
     if (!match) return DEFAULT_LIMIT;
-    return Math.min(Math.max(parseInt(match[1], 10), 1), MAX_LIMIT);
+    return this._normalizeLimit(match[1]) ?? DEFAULT_LIMIT;
+  }
+
+  /** @private */
+  _normalizeLimit(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.min(Math.max(parsed, 1), MAX_LIMIT);
   }
 }

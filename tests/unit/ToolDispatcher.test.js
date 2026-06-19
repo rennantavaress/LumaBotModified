@@ -198,4 +198,54 @@ describe("ToolDispatcher — ferramentas sociais", () => {
       targetJid: "222@s.whatsapp.net",
     });
   });
+
+  it("show_summary usa o ResumoPlugin injetado com limite opcional", async () => {
+    const bot = makeBot({ body: "Luma, resume as ultimas 30 mensagens" });
+    const resumoPlugin = {
+      showSummary: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await ToolDispatcher.handleToolCalls(bot, [{
+      name: "show_summary",
+      args: { limit: 30 },
+    }], null, null, { resumoPlugin });
+
+    expect(resumoPlugin.showSummary).toHaveBeenCalledWith(bot, {
+      limit: 30,
+    });
+  });
+
+  it("protege pedidos de resumo quando a IA escolhe clear_history por engano", async () => {
+    const bot = makeBot({ body: "faça um resumo da conversa" });
+    const lumaHandler = {
+      clearHistory: vi.fn(),
+    };
+    const resumoPlugin = {
+      showSummary: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await ToolDispatcher.handleToolCalls(bot, [{
+      name: "clear_history",
+      args: {},
+    }], lumaHandler, null, { resumoPlugin });
+
+    expect(lumaHandler.clearHistory).not.toHaveBeenCalled();
+    expect(resumoPlugin.showSummary).toHaveBeenCalledWith(bot, {
+      limit: null,
+    });
+  });
+
+  it("mantem clear_history para pedidos explícitos de limpar memória", async () => {
+    const bot = makeBot({ body: "Luma, limpa sua memória dessa conversa" });
+    const lumaHandler = {
+      clearHistory: vi.fn(),
+    };
+
+    await ToolDispatcher.handleToolCalls(bot, [{
+      name: "clear_history",
+      args: {},
+    }], lumaHandler);
+
+    expect(lumaHandler.clearHistory).toHaveBeenCalledWith(bot.jid);
+  });
 });

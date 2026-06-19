@@ -25,4 +25,11 @@ describe("LUMA_CONFIG — ferramentas sociais contextuais", () => {
     expect(tool.parameters.properties.target.enum).toEqual(["self", "mentioned_user"]);
     expect(tool.description).toContain("Nunca use apenas");
   });
+  it("declara show_summary com limite opcional", () => {
+    const tool = getTool("show_summary");
+
+    expect(tool).toBeDefined();
+    expect(tool.parameters.properties.limit.type).toBe("NUMBER");
+    expect(tool.description).toContain("SOMENTE");
+  });
 });

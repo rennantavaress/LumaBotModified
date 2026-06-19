@@ -14,7 +14,7 @@ import { UserPlugin } from "../plugins/user/UserPlugin.js";
  * Recebe as chamadas de função (tool calls) do Gemini e as executa.
  */
 export class ToolDispatcher {
-    static async handleToolCalls(bot, toolCalls, lumaHandler, quotedBot = null) {
+    static async handleToolCalls(bot, toolCalls, lumaHandler, quotedBot = null, toolContext = {}) {
         if (!toolCalls || toolCalls.length === 0) return;
 
         for (const call of toolCalls) {
@@ -37,6 +37,12 @@ export class ToolDispatcher {
                         await this.handleCreateGif(bot, quotedBot);
                         break;
                     case "clear_history":
+                        if (this.isSummaryRequest(bot.body)) {
+                            await this.handleShowSummary(bot, {
+                                limit: this.extractSummaryLimit(bot.body),
+                            }, toolContext);
+                            break;
+                        }
                         await this.handleClearHistory(bot, lumaHandler);
                         break;
                     case "change_personality":
@@ -56,6 +62,9 @@ export class ToolDispatcher {
                         break;
                     case "set_nickname":
                         await this.handleSetNickname(bot, call.args);
+                        break;
+                    case "show_summary":
+                        await this.handleShowSummary(bot, call.args, toolContext);
                         break;
                     default:
                         Logger.warn(`⚠️ Ferramenta desconhecida: ${call.name}`);
@@ -263,10 +272,44 @@ export class ToolDispatcher {
         await bot.sendText(MENUS.HELP_TEXT);
     }
 
+    static async handleShowSummary(bot, args, toolContext = {}) {
+        const resumoPlugin = toolContext.resumoPlugin;
+        if (!resumoPlugin?.showSummary) {
+            await bot.reply("Não consegui acessar o histórico recente para resumir agora.");
+            return;
+        }
+
+        await resumoPlugin.showSummary(bot, {
+            limit: args?.limit,
+        });
+    }
+
     /**
      * Exibe a lista do ranking ou a posição de uma pessoa. Menções reais têm
      * prioridade; pedidos por nome dependem de correspondência exata.
      */
+    static isSummaryRequest(text) {
+        const normalized = this.normalizeText(text);
+        return /\b(resumo|resumir|resume|resuma|sintese|sintetiza|sintetizar)\b/.test(normalized);
+    }
+
+    static extractSummaryLimit(text) {
+        const normalized = this.normalizeText(text);
+        const match = normalized.match(/\b(?:ultimas?|ultimos?|resumo|resume|resuma|resumir)\s+(\d{1,3})\b/);
+        if (!match) return null;
+        return parseInt(match[1], 10);
+    }
+
+    static normalizeText(text) {
+        return String(text || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[!?.,:;]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
     static async handleShowRank(bot, args) {
         const scope = this.resolveRankScope(bot);
         const target = String(args?.target || "").trim();
