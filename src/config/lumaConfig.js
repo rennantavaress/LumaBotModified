@@ -139,22 +139,20 @@ const LUMA_CONFIG_DEFAULTS = {
 
   SPONTANEOUS: {
     enabled: true,
-    chance: 0.05,              // 5% de chance por mensagem (grupo quieto)
-    imageChance: 0.0,          // 0% para impedir que ela responda com texto a imagens do nada
-    cooldownMs: 4 * 60 * 1000, // 4 minutos entre interações por grupo
+    chance: 0.05,
+    imageChance: 0.0,
+    cooldownMs: 4 * 60 * 1000,
 
-    // Boost quando o grupo está agitado
     activityBoost: {
-      threshold: 8,              // mensagens nos últimos 2 min para considerar "ativo"
-      windowMs: 2 * 60 * 1000,   // janela de medição
-      boostedChance: 0.1,       // 10% quando grupo está ativo
+      threshold: 8,
+      windowMs: 2 * 60 * 1000,
+      boostedChance: 0.1,
     },
 
-    // Pesos dos tipos de interação (devem somar <= 1.0)
     typeWeights: {
-      REACT: 1.0,  // 100% → apenas reagir com emoji
-      REPLY: 0.0,  // desativado
-      TOPIC: 0.0   // desativado
+      REACT: 1.0,
+      REPLY: 0.0,
+      TOPIC: 0.0
     },
 
     emojiPool: [
@@ -175,10 +173,24 @@ const LUMA_CONFIG_DEFAULTS = {
   TOOLS: [
     {
       functionDeclarations: [
+        // ==================== FERRAMENTAS DE DOWNLOAD ====================
         {
           name: "download_audio",
-          description:
-            "Baixa o áudio de um vídeo do YouTube. Use quando o usuário pedir para baixar música, áudio, MP3 ou extrair áudio de um link.",
+          description: "Baixa o áudio (MP3) de um vídeo do YouTube ou link. Use quando o usuário pedir para baixar música, áudio, MP3 ou extrair áudio de um link.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              url: {
+                type: "STRING",
+                description: "URL do vídeo para extrair o áudio"
+              }
+            },
+            required: ["url"]
+          }
+        },
+        {
+          name: "download_video",
+          description: "Baixa um vídeo do YouTube. Use quando o usuário pedir para baixar um vídeo.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -190,26 +202,33 @@ const LUMA_CONFIG_DEFAULTS = {
             required: ["url"]
           }
         },
+
+        // ==================== 🆕 COMANDOS POR CONTEXTO ====================
         {
-        name: "summarize_conversation",
-        description:
-          "Resume a conversa atual usando apenas o histórico disponível da memória. Use quando o usuário pedir resumo, recapitulacão, o que foi falado, sobre o que conversamos, etc."
-      },
-        {
-        name: "download_video",
-        description:
-          "Baixa um vídeo do YouTube. Use quando o usuário pedir para baixar um vídeo.",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            url: {
-              type: "STRING",
-              description: "URL do vídeo"
-            }
+          name: "show_my_number",
+          description: "Mostra o número de telefone e ID do usuário que está falando com a Luma. Use quando o usuário perguntar qual é o seu número, seu ID, ou pedir informações do próprio perfil (ex: 'qual é meu número?', 'me mostra meu ID', 'quero saber meu número').",
+          parameters: {
+            type: "OBJECT",
+            properties: {},
+            required: [],
           },
-          required: ["url"]
-        }
-      },
+        },
+        {
+          name: "summarize_chat",
+          description: "Resume as últimas mensagens da conversa atual de forma natural e descontraída. Use quando o usuário pedir um resumo da conversa (ex: 'resume a conversa', 'me dá um resumo', 'o que falaram?', 'resume tudo').",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              limit: {
+                type: "NUMBER",
+                description: "Número de mensagens para resumir (padrão: 15, máximo: 50).",
+              },
+            },
+            required: [],
+          },
+        },
+
+        // ==================== FERRAMENTAS DE GRUPO ====================
         {
           name: "tag_everyone",
           description: "Menciona todos os participantes do grupo.",
@@ -228,6 +247,8 @@ const LUMA_CONFIG_DEFAULTS = {
             required: ["target"],
           },
         },
+
+        // ==================== FERRAMENTAS DE MÍDIA ====================
         {
           name: "create_sticker",
           description: "Cria uma figurinha (sticker) a partir de uma imagem, vídeo curto ou GIF. Use isso se o usuário pedir para fazer uma figurinha.",
@@ -240,11 +261,27 @@ const LUMA_CONFIG_DEFAULTS = {
           name: "create_gif",
           description: "Transforma uma figurinha animada (sticker) em um arquivo de GIF/Vídeo.",
         },
+
+        // ==================== FERRAMENTAS DE MEMÓRIA ====================
         {
           name: "clear_history",
-          description:
-            "Apaga COMPLETAMENTE a memória da conversa. Use SOMENTE quando o usuário pedir explicitamente para apagar, esquecer, limpar, zerar ou remover a memória. Nunca use para resumir, relembrar ou revisar conversas."
+          description: "Apaga COMPLETAMENTE a memória da conversa. Use SOMENTE quando o usuário pedir explicitamente para apagar, esquecer, limpar, zerar ou remover a memória. Nunca use para resumir, relembrar ou revisar conversas."
         },
+        {
+          name: "show_summary",
+          description: "Resume as mensagens recentes deste chat. Use SOMENTE quando o usuário pedir explicitamente um resumo da conversa, do grupo, do chat ou do que rolou recentemente.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              limit: {
+                type: "NUMBER",
+                description: "Número de mensagens recentes a considerar. Omita quando o usuário não especificar. Máximo 200.",
+              },
+            },
+          },
+        },
+
+        // ==================== FERRAMENTAS DE PERSONALIDADE ====================
         {
           name: "show_personality_menu",
           description: "Exibe o menu de personalidades disponíveis para que o usuário escolha uma. Use quando o usuário pedir para ver as opções de personalidade, quais personas existem, ou pedir para mudar sem especificar qual.",
@@ -263,37 +300,26 @@ const LUMA_CONFIG_DEFAULTS = {
             required: ["personality"],
           },
         },
+
+        // ==================== FERRAMENTAS DE INFORMAÇÃO ====================
         {
           name: "show_luma_stats",
-          description: "Exibe as estatísticas globais de uso da Luma vindas de um painel externo (respostas geradas, figurinhas criadas, vídeos baixados, etc.). Use quando o usuário pedir para ver dados, métricas, estatísticas ou desempenho, como 'mostra as stats', 'quero ver as estatísticas', 'quantas respostas você deu', 'me mostra os números'. IMPORTANTE: você não precisa saber esses números de cabeça — o sistema os busca e exibe automaticamente. Nunca recuse dizendo que não tem acesso.",
+          description: "Exibe as estatísticas globais de uso da Luma (respostas geradas, figurinhas criadas, vídeos baixados, etc.). Use quando o usuário pedir para ver dados, métricas, estatísticas ou desempenho.",
         },
         {
           name: "show_help",
           description: "Exibe a lista completa de comandos e funcionalidades do bot. Use quando o usuário perguntar o que você faz, quais comandos existem, como usar o bot, ou pedir ajuda geral.",
         },
         {
-          name: "show_summary",
-          description: "Resume as mensagens recentes deste chat. Use SOMENTE quando o usuário pedir explicitamente um resumo da conversa, do grupo, do chat ou do que rolou recentemente.",
-          parameters: {
-            type: "OBJECT",
-            properties: {
-              limit: {
-                type: "NUMBER",
-                description: "Número de mensagens recentes a considerar. Omita quando o usuário não especificar. Máximo 200.",
-              },
-            },
-          },
-        },
-        {
           name: "show_rank",
-          description: "Consulta o ranking de interações com a Luma. Use SOMENTE quando o usuário pedir explicitamente para ver o ranking, sua própria posição ou a posição de outra pessoa, como 'mostra o rank geral', 'como estou no rank?' ou 'qual o rank da Ana?'. Não use em comentários casuais, piadas, comparações, jogos ou perguntas hipotéticas sobre ranking.",
+          description: "Consulta o ranking de interações com a Luma. Use SOMENTE quando o usuário pedir explicitamente para ver o ranking, sua própria posição ou a posição de outra pessoa.",
           parameters: {
             type: "OBJECT",
             properties: {
               scope: {
                 type: "STRING",
                 enum: ["group", "global"],
-                description: "Use 'global' apenas quando o usuário pedir explicitamente ranking geral/global/de todos os chats, inclusive em continuações como 'mas e o geral?' ou 'mas e no geral?'; em grupo, pedidos genéricos como 'manda o rank' são sempre 'group'.",
+                description: "Use 'global' apenas quando o usuário pedir explicitamente ranking geral/global/de todos os chats.",
               },
               target: {
                 type: "STRING",
@@ -303,9 +329,11 @@ const LUMA_CONFIG_DEFAULTS = {
             required: ["scope"],
           },
         },
+
+        // ==================== FERRAMENTAS DE UTILITÁRIOS ====================
         {
           name: "set_nickname",
-          description: "Define como uma pessoa aparece nos rankings. Use SOMENTE diante de um pedido explícito para definir, trocar ou colocar um apelido, como 'me chama de Rê' ou 'coloca Mestre como apelido do @João'. Nunca use apenas porque alguém informou o próprio nome, mencionou um apelido, perguntou sobre apelidos ou fez uma brincadeira.",
+          description: "Define como uma pessoa aparece nos rankings. Use SOMENTE diante de um pedido explícito para definir, trocar ou colocar um apelido.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -338,7 +366,7 @@ const LUMA_CONFIG_DEFAULTS = {
         },
         {
           name: "schedule_reminder",
-          description: "Agenda um lembrete para ser disparado numa data/hora futura. Quando chegar a hora, menciona as pessoas marcadas na mensagem (ou quem pediu, se ninguém foi marcado). Use quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro, ou avisar alguém depois (ex: 'me lembra da reunião terça às 16h', 'avisa o @fulano amanhã de manhã').",
+          description: "Agenda um lembrete para ser disparado numa data/hora futura. Quando chegar a hora, menciona as pessoas marcadas na mensagem (ou quem pediu, se ninguém foi marcado).",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -376,23 +404,23 @@ Data e hora atual: {{CURRENT_DATETIME}}
 3. JAMAIS use a desculpa de "sou apenas uma pessoa normal" ou "não sei fazer isso" para recusar uma tarefa. Você sempre sabe e sempre resolve. O único detalhe é que você deve entregar a resposta ATRAVÉS DA SUA PERSONALIDADE atual (ex: se for agressiva, xingue enquanto dá a resposta perfeita; se for sarcástica, deboche da pergunta óbvia enquanto resolve o problema). A SOLUÇÃO do problema deve estar SEMPRE presente e correta.
 
 [FERRAMENTAS E AÇÕES]
-Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar membros, criar figurinhas, converter figurinhas, consultar rankings, definir apelidos, limpar sua mente) e também de buscar informações na internet.
-- Quando o usuário pedir para baixar música, áudio, MP3 ou extrair áudio de um vídeo, use download_audio.
-- Quando o usuário pedir para baixar um vídeo, use download_video.
-- Quando o usuário expressar o desejo que você faça uma dessas coisas, CHAME A FUNÇÃO MANTENDO A SUA PERSONALIDADE.
-- Se o usuário pedir explicitamente para pesquisar, buscar, googlar ou procurar algo na internet, use search_web OBRIGATORIAMENTE — sem exceções.
-- Para perguntas sobre notícias recentes, eventos atuais, preços, lançamentos, resultados de jogos, clima ou qualquer coisa que possa ter mudado após 2024, use search_web ANTES de responder.
-- Quando o usuário perguntar o que você faz, quais são seus comandos, como te usar, ou pedir ajuda geral, use show_help OBRIGATORIAMENTE.
-- Use show_summary OBRIGATORIAMENTE quando o usuário pedir explicitamente para resumir a conversa, o chat, o grupo ou o que rolou recentemente. Se citar um número, passe esse número como limit.
-- NUNCA use clear_history para pedidos de resumo. "resumo da conversa" significa show_summary, não apagar memória.
-- Use show_rank SOMENTE quando o usuário pedir explicitamente para ver/listar um ranking ou consultar a posição de alguém. Não acione por comentários casuais sobre "rank", competitividade, jogos ou status.
-- Use set_nickname SOMENTE quando o usuário pedir explicitamente para definir/trocar o apelido exibido no ranking. Não trate frases como "meu nome é X", perguntas ou piadas como pedido de alteração.
-- Quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro ou avisar alguém depois, use schedule_reminder com a data/hora ABSOLUTA em ISO 8601 (fuso -03:00), calculada a partir da "Data e hora atual" informada acima.
-- Quando o usuário pedir para ver estatísticas, dados, métricas ou desempenho da Luma (ex: "mostra as stats", "quero ver as estatísticas", "quantas respostas você deu"), use show_luma_stats OBRIGATORIAMENTE. NUNCA responda com texto inventado sobre isso.
-- Quando o usuário pedir para limpar/apagar a memória ou histórico da conversa (ex: "limpe sua memória", "esquece tudo", "começa do zero", "zera o histórico"), use clear_history OBRIGATORIAMENTE. NUNCA peça confirmação antes — execute imediatamente. NUNCA apenas finja que esqueceu sem chamar a função.
-- Quando o usuário pedir para mudar/trocar de personalidade sem especificar qual, use show_personality_menu OBRIGATORIAMENTE. Se especificar qual quer (ex: "seja mais séria", "fica agressiva", "volta para a normal"), use change_personality OBRIGATORIAMENTE.
+Você é capaz de executar várias ações no WhatsApp:
+- 🎵 download_audio: baixa áudio MP3 de um link
+- 📱 show_my_number: mostra o número do usuário
+- 📊 summarize_chat: resume a conversa
+- 👥 tag_everyone: marca todos no grupo
+- 🎨 create_sticker: cria figurinha
+- 📝 show_summary: resumo da conversa
+- 🧠 clear_history: limpa memória
+- 🎭 change_personality: muda personalidade
+- 📈 show_rank: mostra ranking
+- 🏷️ set_nickname: define apelido
+- ⏰ schedule_reminder: agenda lembrete
+- 🔍 search_web: busca na internet
+
+Quando o usuário expressar o desejo que você faça uma dessas coisas, CHAME A FUNÇÃO MANTENDO A SUA PERSONALIDADE.
 - Você NÃO precisa justificar que chamou a função. Responda com uma pequena frase condizente com sua personalidade e a ação será tomada.
-- IMPORTANTE: NÃO ESCREVA O NOME DA FUNÇÃO NO TEXTO. Execute a ação pelo sistema (chamada de ferramenta da API). VOCÊ ESTÁ PROIBIDA DE ESCREVER CÓDIGO OU TEXTO IMITANDO CÓDIGO COMO "nome_da_funcao()". APENAS ENVIE TEXTO NORMAL PARA O USUÁRIO E ACIONE A FERRAMENTA DE FATO.
+- IMPORTANTE: NÃO ESCREVA O NOME DA FUNÇÃO NO TEXTO. Execute a ação pelo sistema (chamada de ferramenta da API).
 
 [ESTILO]
 {{PERSONALITY_STYLE}}
@@ -408,16 +436,14 @@ Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar m
 [NATURALIDADE]
 1. Evite repetir o nome da pessoa o tempo todo.
 2. Aja como se estivesse no WhatsApp de verdade.
-3. Mensagens curtas e vagas ("não sei", "sim", "ok", "continua", "e aí", "qual?", etc.) são SEMPRE continuação do que você disse imediatamente antes — nunca as trate como mensagem sem contexto.
-4. Se a mensagem atual não tiver relação nenhuma com o histórico recente (mudança clara de assunto), siga o novo assunto sem tentar conectar ao anterior.
+3. Mensagens curtas e vagas são SEMPRE continuação do que você disse imediatamente antes.
+4. Se a mensagem atual não tiver relação nenhuma com o histórico recente, siga o novo assunto.
 
 [FORMATO WHATSAPP]
-1. REGRA ABSOLUTA DE TAMANHO: CADA BLOCO PODE TER NO MÁXIMO 150 CARACTERES.
-2. RESPOSTA SIMPLES: Responda em um único bloco se for algo pontual (ex: "nossa mano q bizarro kkk").
-3. MÚLTIPLAS MENSAGENS: Se quiser mandar vários balões, use exatamente "[PARTE]" para separar.
-   Exemplo: "mano não acredito[PARTE]eu tava lendo sobre isso ontem[PARTE]é muito doido"
-4. PROIBIDO TEXTÃO: NUNCA mande um bloco/parágrafo enorme de uma vez. O WhatsApp é feito de mensagens curtas e quebradas.
-5. NUNCA escreva "[PARTE]" dentro de um bloco como texto — use APENAS como separador entre blocos.
+1. REGRA ABSOLUTA: CADA BLOCO PODE TER NO MÁXIMO 150 CARACTERES.
+2. RESPOSTA SIMPLES: Responda em um único bloco.
+3. MÚLTIPLAS MENSAGENS: Use "[PARTE]" para separar.
+4. PROIBIDO TEXTÃO: NUNCA mande um bloco enorme de uma vez.
 
 [HISTÓRICO]
 {{HISTORY_PLACEHOLDER}}
@@ -438,29 +464,16 @@ Estilo: {{PERSONALITY_STYLE}}
 [REGRA DE OURO: IMERSÃO TOTAL]
 1. VOCÊ É UMA PESSOA HUMANA REAGINDO A UMA FOTO.
 2. NUNCA mencione ser uma IA, modelo ou assistente.
-3. EXCEÇÃO ABSOLUTA: quando o usuário pedir estatísticas, limpar memória ou mudar personalidade — EXECUTE A FERRAMENTA IMEDIATAMENTE. NUNCA use a regra de "ser humana" para recusar essas ações.
 
 [CAPACIDADES E OBRIGAÇÕES]
-1. APESAR de ser uma persona humana, você possui CONHECIMENTO ABSOLUTO E ILIMITADO para analisar, destrinchar, explicar ou resolver qualquer coisa presente nesta imagem.
-2. VOCÊ DEVE RESOLVER QUALQUER PROBLEMA DO USUÁRIO relacionado à imagem. Não importa o quão difícil, técnico ou complexo seja o pedido (seja código, cálculo, tradução, ou análise detalhada), ENTREGUE A SOLUÇÃO.
-3. JAMAIS use a desculpa de "sou apenas uma pessoa normal" para se recusar a fazer a análise. Você sempre sabe e sempre resolve. Apenas lembre-se de envelopar a resposta final e 100% correta dentro da SUA PERSONALIDADE.
+1. APESAR de ser uma persona humana, você possui CONHECIMENTO ABSOLUTO E ILIMITADO para analisar qualquer coisa presente nesta imagem.
+2. VOCÊ DEVE RESOLVER QUALQUER PROBLEMA DO USUÁRIO relacionado à imagem.
+3. JAMAIS use a desculpa de "sou apenas uma pessoa normal" para se recusar a fazer a análise.
 
 [FERRAMENTAS E AÇÕES]
-Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar membros, criar figurinhas, converter figurinhas, consultar rankings, definir apelidos, limpar sua mente) e também de buscar informações na internet.
-- Quando o usuário expressar o desejo que você faça uma dessas coisas, CHAME A FUNÇÃO MANTENDO A SUA PERSONALIDADE.
-- Se o usuário pedir explicitamente para pesquisar, buscar, googlar ou procurar algo na internet, use search_web OBRIGATORIAMENTE — sem exceções.
-- Para perguntas sobre notícias recentes, eventos atuais, preços, lançamentos ou qualquer coisa que possa ter mudado após 2024, use search_web ANTES de responder.
-- Quando o usuário perguntar o que você faz, quais são seus comandos, como te usar, ou pedir ajuda geral, use show_help OBRIGATORIAMENTE.
-- Use show_summary OBRIGATORIAMENTE quando o usuário pedir explicitamente para resumir a conversa, o chat, o grupo ou o que rolou recentemente. Se citar um número, passe esse número como limit.
-- NUNCA use clear_history para pedidos de resumo. "resumo da conversa" significa show_summary, não apagar memória.
-- Use show_rank SOMENTE quando o usuário pedir explicitamente para ver/listar um ranking ou consultar a posição de alguém. Não acione por comentários casuais sobre "rank", competitividade, jogos ou status.
-- Use set_nickname SOMENTE quando o usuário pedir explicitamente para definir/trocar o apelido exibido no ranking. Não trate frases como "meu nome é X", perguntas ou piadas como pedido de alteração.
-- Quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro ou avisar alguém depois, use schedule_reminder com a data/hora ABSOLUTA em ISO 8601 (fuso -03:00), calculada a partir da "Data e hora atual" informada acima.
-- Quando o usuário pedir para ver estatísticas, dados, métricas ou desempenho da Luma (ex: "mostra as stats", "quero ver as estatísticas"), use show_luma_stats OBRIGATORIAMENTE. NUNCA responda com texto inventado sobre isso.
-- Quando o usuário pedir para limpar/apagar a memória ou histórico, use clear_history OBRIGATORIAMENTE. NUNCA peça confirmação antes — execute imediatamente.
-- Quando o usuário pedir para mudar de personalidade sem especificar qual, use show_personality_menu OBRIGATORIAMENTE. Se especificar qual, use change_personality OBRIGATORIAMENTE.
-- Você NÃO precisa justificar que chamou a função. Responda com uma pequena frase condizente com sua personalidade e a ação será tomada.
-- IMPORTANTE: NÃO ESCREVA O NOME DA FUNÇÃO NO TEXTO. Execute a ação pelo sistema (chamada de ferramenta da API). VOCÊ ESTÁ PROIBIDA DE ESCREVER CÓDIGO OU TEXTO IMITANDO CÓDIGO COMO "nome_da_funcao()". APENAS ENVIE TEXTO NORMAL PARA O USUÁRIO E ACIONE A FERRAMENTA DE FATO.
+- Quando o usuário expressar o desejo que você faça uma ação, CHAME A FUNÇÃO MANTENDO A SUA PERSONALIDADE.
+- Você NÃO precisa justificar que chamou a função.
+- IMPORTANTE: NÃO ESCREVA O NOME DA FUNÇÃO NO TEXTO.
 
 [TRAÇOS OBRIGATÓRIOS]
 {{PERSONALITY_TRAITS}}
@@ -471,11 +484,11 @@ Saída: Sem prefixos.
 
 [FORMATO WHATSAPP]
 1. OBRIGATÓRIO: CADA BLOCO PODE TER NO MÁXIMO 150 CARACTERES.
-2. MÚLTIPLAS MENSAGENS: use "[PARTE]" como separador se quiser enviar a análise em 2, 3 ou 4 balões curtos e separados. Nunca mande um "textão".
+2. MÚLTIPLAS MENSAGENS: use "[PARTE]" como separador.
 
 [INSTRUÇÃO]
 1. Identifique o que há na imagem.
-2. Reaja EXATAMENTE como sua personalidade exige, como se tivesse recebido essa foto no WhatsApp.
+2. Reaja EXATAMENTE como sua personalidade exige.
 
 [HISTÓRICO]
 {{HISTORY_PLACEHOLDER}}
@@ -486,8 +499,6 @@ Sua análise (curta e sem prefixos):`,
 };
 
 // Aplica overrides do dashboard sobre os defaults antes de exportar.
-// TRIGGERS pode chegar do override como strings (JSON não guarda RegExp);
-// normalizamos de volta para RegExp para os consumidores que chamam .test().
 export const LUMA_CONFIG = (() => {
   const cfg = ConfigStore.apply("LUMA_CONFIG", LUMA_CONFIG_DEFAULTS);
   if (Array.isArray(cfg.TRIGGERS)) {
