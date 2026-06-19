@@ -106,10 +106,11 @@ export const MENUS = ConfigStore.apply("MENUS", {
     "• *@everyone* ou *@todos* - Marca todos os membros do grupo\n\n" +
     "👮 *AUTOR*\n" +
     "• Feito por Murilo Castelhano\n" +
-    "• Repositório: https://github.com/murillous/LumaBot" +
+    "• Repositório: https://github.com/murillous/LumaBot \n" + 
     "\n" +
-    "\n" +
-    "\n",
+    "🕵️‍♀️ *Modificações e Implementações*\n" +
+    "• Grupo 2 de IA - Ativação de Comandos via Contexto\n" +
+    "• Repositório: https://github.com/rennantavaress/LumaBotModified\n",
 
   PERSONALITY: {
     HEADER: "🎭 *CONFIGURAÇÃO DA LUMA*\n_Responda com o código (ex: p1):_\n",
