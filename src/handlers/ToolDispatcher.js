@@ -10,6 +10,7 @@ import { ReminderService } from "../core/services/ReminderService.js";
 import { RankPlugin } from "../plugins/luma/RankPlugin.js";
 import { VideoDownloader } from "../services/VideoDownloader.js";
 import { UserPlugin } from "../plugins/user/UserPlugin.js";
+import { extractUrl } from "../utils/MessageUtils.js";
 
 /**
  * Despachante de ferramentas acionadas pela IA.
@@ -17,46 +18,33 @@ import { UserPlugin } from "../plugins/user/UserPlugin.js";
  */
 export class ToolDispatcher {
     static async handleClearHistory(bot, lumaHandler) {
+        const msg = (bot.body || "").toLowerCase();
 
-    const msg = (bot.body || "").toLowerCase();
+        const clearPatterns = [
+            "limpa a memória",
+            "apaga a memória",
+            "esquece tudo",
+            "zera o histórico", 
+            "apaga o histórico",
+            "limpar memória",
+            "esquecer conversa"
+        ];
 
-    const clearPatterns = [
-        "limpa a memória",
-        "apaga a memória",
-        "esquece tudo",
-        "zera o histórico", 
-        "apaga o histórico",
-        "limpar memória",
-        "esquecer conversa"
-    ];
+        const shouldClear = clearPatterns.some(p => msg.includes(p));
 
-    const shouldClear = clearPatterns.some(p =>
-        msg.includes(p)
-    );
+        if (!shouldClear) {
+            Logger.warn("⚠️ clear_history bloqueado: usuário não pediu explicitamente.");
+            return;
+        }
 
-    if (!shouldClear) {
-        Logger.warn(
-            "⚠️ clear_history bloqueado: usuário não pediu explicitamente."
-        );
-        return;
+        const historyKey = bot.isGroup ? `${bot.jid}:${bot.senderJid}` : bot.jid;
+        lumaHandler.clearHistory(historyKey);
+        lumaHandler.clearGroupBuffer?.(bot.jid);
+        await bot.reply("🗑️ Minha memória para essa conversa foi apagada.");
     }
 
-    const historyKey =
-        bot.isGroup
-            ? `${bot.jid}:${bot.senderJid}`
-            : bot.jid;
+    // ==================== HANDLERS DAS FERRAMENTAS ====================
 
-    lumaHandler.clearHistory(historyKey);
-    lumaHandler.clearGroupBuffer?.(bot.jid);
-
-    await bot.reply(
-        "🗑️ Minha memória para essa conversa foi apagada."
-    );
-}
-   static async handleDownloadAudio(bot, args) {
-    await bot.reply("✅ A tool download_audio foi chamada!");
-}
-    
     static async handleToolCalls(bot, toolCalls, lumaHandler, quotedBot = null, toolContext = {}) {
         if (!toolCalls || toolCalls.length === 0) return;
 
@@ -64,18 +52,23 @@ export class ToolDispatcher {
             Logger.info(`🔧 Luma acionou a ferramenta: ${call.name}`);
             try {
                 switch (call.name) {
+                    // 🎵 ÁUDIO
                     case "download_audio":
-                    await this.handleDownloadAudio(bot, call.args);
-                    break;
+                        await this.handleDownloadAudio(bot, call.args);
+                        break;
                     case "download_video":
                         await this.handleDownloadVideo(bot, call.args);
                         break;
+
+                    // 👥 GRUPO
                     case "tag_everyone":
                         await this.handleTagEveryone(bot);
                         break;
                     case "remove_member":
                         await this.handleRemoveMember(bot, call.args);
                         break;
+
+                    // 🎨 MÍDIA
                     case "create_sticker":
                         await this.handleCreateSticker(bot, quotedBot);
                         break;
@@ -85,6 +78,8 @@ export class ToolDispatcher {
                     case "create_gif":
                         await this.handleCreateGif(bot, quotedBot);
                         break;
+
+                    // 🧠 MEMÓRIA E PERSONALIDADE
                     case "clear_history":
                         if (this.isSummaryRequest(bot.body)) {
                             await this.handleShowSummary(bot, {
@@ -97,14 +92,10 @@ export class ToolDispatcher {
                     case "change_personality":
                         await this.handleChangePersonality(bot, call.args);
                         break;
+
+                    // 📊 INFORMAÇÕES
                     case "show_help":
                         await this.handleShowHelp(bot);
-                        break;
-                    case "schedule_reminder":
-                        await this.handleScheduleReminder(bot, call.args);
-                        break;
-                    case "show_personality_menu":
-                        await this.handleShowPersonalityMenu(bot);
                         break;
                     case "show_luma_stats":
                         await this.handleShowStats(bot, lumaHandler);
@@ -112,12 +103,29 @@ export class ToolDispatcher {
                     case "show_rank":
                         await this.handleShowRank(bot, call.args);
                         break;
+
+                    // 🆕 NOVAS FERRAMENTAS (COMANDOS POR CONTEXTO)
+                    case "show_my_number":
+                        await this.handleShowMyNumber(bot);
+                        break;
+                    case "summarize_chat":
+                        await this.handleSummarizeChat(bot, call.args);
+                        break;
+
+                    // ⏰ LEMBRETES
+                    case "schedule_reminder":
+                        await this.handleScheduleReminder(bot, call.args);
+                        break;
+                    case "show_personality_menu":
+                        await this.handleShowPersonalityMenu(bot);
+                        break;
                     case "set_nickname":
                         await this.handleSetNickname(bot, call.args);
                         break;
                     case "show_summary":
                         await this.handleShowSummary(bot, call.args, toolContext);
                         break;
+
                     default:
                         Logger.warn(`⚠️ Ferramenta desconhecida: ${call.name}`);
                 }
@@ -127,6 +135,61 @@ export class ToolDispatcher {
         }
     }
 
+    // ==================== FERRAMENTAS DE ÁUDIO ====================
+
+    /**
+     * 🆕 Baixa áudio de um link de vídeo (MP3)
+     * Ativado por: "Luma, baixa esse áudio" (respondendo a um link)
+     */
+    static async handleDownloadAudio(bot, args) {
+        try {
+            const url = args?.url || extractUrl(bot.body) || extractUrl(bot.quotedText);
+            
+            if (!url) {
+                await bot.reply('🎵 Me envie um link de vídeo (YouTube, SoundCloud, etc.) para eu baixar o áudio.');
+                return;
+            }
+
+            try {
+                new URL(url);
+            } catch {
+                await bot.reply('🔗 URL inválida. Me envie um link válido.');
+                return;
+            }
+
+            await bot.reply(`🎵 Baixando áudio... Isso pode levar alguns segundos.`);
+            
+            const result = await VideoDownloader.downloadAudio(url);
+            
+            if (!result?.filePath) {
+                await bot.reply('❌ Não consegui baixar o áudio. Verifique o link e tente novamente.');
+                return;
+            }
+
+            const audioBuffer = fs.readFileSync(result.filePath);
+            await bot.sendMessage(bot.jid, {
+                audio: audioBuffer,
+                mimetype: "audio/mpeg",
+                fileName: `${result.title || 'audio'}.mp3`,
+            });
+            
+            DatabaseService.incrementMetric("audios_downloaded");
+            await bot.reply('✅ Áudio baixado e enviado com sucesso!');
+            
+            try { fs.unlinkSync(result.filePath); } catch {}
+        } catch (error) {
+            Logger.error('❌ Erro ao baixar áudio:', error);
+            await bot.reply('❌ Não consegui baixar o áudio. Verifique o link e tente novamente.');
+        }
+    }
+
+    static async handleDownloadVideo(bot, args) {
+        // Implementar se necessário
+        await bot.reply("🎬 Download de vídeo ainda não implementado.");
+    }
+
+    // ==================== FERRAMENTAS DE GRUPO ====================
+
     static async handleTagEveryone(bot) {
         if (bot.isGroup) {
             await GroupManager.mentionEveryone(bot.raw, bot.socket);
@@ -135,9 +198,6 @@ export class ToolDispatcher {
         }
     }
 
-    /**
-     * Remove um membro do grupo. Somente administradores podem solicitar.
-     */
     static async handleRemoveMember(bot, args) {
         if (!bot.isGroup) {
             await bot.reply("⚠️ Eu só consigo remover pessoas de grupos.");
@@ -152,7 +212,6 @@ export class ToolDispatcher {
         const cleanJid = (id) => (id ? id.split(":")[0].split("@")[0].replace(/\D/g, "") : null);
         const senderClean = cleanJid(senderJid);
 
-        // Verifica se quem pediu é administrador
         const senderIsAdmin = groupMetadata.participants.some((p) => {
             return cleanJid(p.id) === senderClean && p.admin;
         });
@@ -171,10 +230,6 @@ export class ToolDispatcher {
         await this._executeKick(bot, target);
     }
 
-    /**
-     * Localiza o membro alvo no grupo e o remove, caso o bot também seja admin.
-     * @private
-     */
     static async _executeKick(bot, targetName) {
         const sock = bot.socket;
         const jid = bot.jid;
@@ -182,7 +237,6 @@ export class ToolDispatcher {
         const cleanJid = (id) => (id ? id.split(":")[0].split("@")[0].replace(/\D/g, "") : null);
         const senderJid = bot.raw.key.participant || bot.raw.key.remoteJid;
 
-        // Tenta localizar o alvo por menção ou número
         let targetJid;
         let targetParticipant;
         let wasRandom = false;
@@ -212,13 +266,12 @@ export class ToolDispatcher {
                 return;
             }
 
-            const chosen      = eligible[Math.floor(Math.random() * eligible.length)];
-            targetJid         = chosen.id;
+            const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+            targetJid = chosen.id;
             targetParticipant = chosen;
-            wasRandom         = true;
+            wasRandom = true;
         }
 
-        // Verifica se o bot é admin no grupo
         const botJid = sock.user?.id || sock.authState?.creds?.me?.id;
         const botLid = sock.user?.lid || sock.authState?.creds?.me?.id;
         const botIdClean = cleanJid(botJid);
@@ -248,7 +301,7 @@ export class ToolDispatcher {
         await bot.reply(kickMsg, { mentions: [targetJid] });
     }
 
-    // --- Handlers de Mídia ---
+    // ==================== HANDLERS DE MÍDIA ====================
 
     static async handleCreateSticker(bot, quotedBot = null) {
         const quoted = quotedBot || bot.getQuotedAdapter();
@@ -298,7 +351,8 @@ export class ToolDispatcher {
         await bot.reply("⚠️ Você precisa responder a uma figurinha animada para eu transformar em GIF!");
     }
 
-    /** Muda a personalidade da Luma neste chat via linguagem natural. */
+    // ==================== PERSONALIDADE E MEMÓRIA ====================
+
     static async handleChangePersonality(bot, args) {
         const key = args?.personality;
         if (!key) {
@@ -325,16 +379,72 @@ export class ToolDispatcher {
             await bot.reply("Não consegui acessar o histórico recente para resumir agora.");
             return;
         }
+        await resumoPlugin.showSummary(bot, { limit: args?.limit });
+    }
 
-        await resumoPlugin.showSummary(bot, {
-            limit: args?.limit,
-        });
+    // ==================== 🆕 NOVAS FERRAMENTAS (COMANDOS POR CONTEXTO) ====================
+
+    /**
+     * 🆕 Mostra o número e ID do usuário que está falando
+     * Ativado por: "Luma, qual é o meu número?" ou "Luma, me mostra meu ID"
+     */
+    static async handleShowMyNumber(bot) {
+        try {
+            const senderJid = bot.senderJid || bot.sender;
+            const number = senderJid?.replace(/@s\.whatsapp\.net$/, '').replace(/@lid$/, '') || 'Não disponível';
+            
+            let response = `📱 **Informações do seu usuário:**\n\n`;
+            response += `👤 **Número:** ${number}\n`;
+            response += `🆔 **ID (JID):** ${senderJid}\n`;
+            
+            try {
+                const userInfo = await bot.getUserInfo?.(senderJid);
+                if (userInfo?.pushName) {
+                    response += `📛 **Nome:** ${userInfo.pushName}\n`;
+                }
+            } catch (e) {}
+            
+            if (bot.isGroup) {
+                const groupMetadata = await bot.socket.groupMetadata(bot.jid);
+                const participant = groupMetadata.participants.find(p => p.id === senderJid);
+                if (participant?.admin) {
+                    response += `👑 **Cargo:** Administrador\n`;
+                }
+            }
+            
+            response += `\n💡 Use \`!nick\` para definir um apelido personalizado.`;
+            await bot.reply(response);
+        } catch (error) {
+            Logger.error('❌ Erro ao mostrar número:', error);
+            await bot.reply('❌ Não consegui buscar seu número agora. Tente novamente.');
+        }
     }
 
     /**
-     * Exibe a lista do ranking ou a posição de uma pessoa. Menções reais têm
-     * prioridade; pedidos por nome dependem de correspondência exata.
+     * 🆕 Gera um resumo da conversa atual
+     * Ativado por: "Luma, resume a conversa" ou "Luma, me dá um resumo"
      */
+    static async handleSummarizeChat(bot, args) {
+        try {
+            const limit = args?.limit || 15;
+            
+            // Verificar se o ResumoPlugin está disponível via toolContext
+            const resumoPlugin = bot.resumoPlugin;
+            if (resumoPlugin?.showSummary) {
+                await resumoPlugin.showSummary(bot, { limit });
+                return;
+            }
+            
+            // Fallback: tentar usar o handler já existente
+            await this.handleShowSummary(bot, { limit });
+        } catch (error) {
+            Logger.error('❌ Erro ao gerar resumo:', error);
+            await bot.reply('❌ Não consegui gerar o resumo agora. Tente novamente.');
+        }
+    }
+
+    // ==================== AUXILIARES ====================
+
     static isSummaryRequest(text) {
         const normalized = this.normalizeText(text);
         return /\b(resumo|resumir|resume|resuma|sintese|sintetiza|sintetizar)\b/.test(normalized);
@@ -375,11 +485,6 @@ export class ToolDispatcher {
         await RankPlugin.showRanking(bot, { scope, targetJid, targetName });
     }
 
-    /**
-     * Em grupos, ranking global exige intenção explícita na mensagem original.
-     * Isso impede que uma classificação imprecisa da IA transforme "manda o
-     * rank" em ranking global. Em conversas privadas, só existe escopo global.
-     */
     static resolveRankScope(bot) {
         if (!bot.isGroup) return "global";
 
@@ -398,8 +503,6 @@ export class ToolDispatcher {
 
         if (explicitlyGroup) return "group";
 
-        // Continuação inequívoca de uma consulta anterior, sem exigir que a
-        // pessoa repita "rank": "mas e o geral?", "mas e no geral?", etc.
         const conciseGlobalFollowUp =
             /^(?:luma\s+)?(?:(?:mas\s+)?e\s+)?(?:(?:quero\s+ver|mostra|manda|envia|exibe|cade)(?:\s+(?:o|no|na))?\s+)?(?:(?:o|no|na)\s+)?(?:(?:rank|ranking)\s+)?(?:geral|global)(?:\s+luma)?$/.test(normalized);
 
@@ -412,10 +515,6 @@ export class ToolDispatcher {
         return explicitlyGlobal ? "global" : "group";
     }
 
-    /**
-     * Define apelidos por linguagem natural. Para terceiros, exige uma menção
-     * real na mensagem; o texto produzido pelo modelo nunca escolhe um JID.
-     */
     static async handleSetNickname(bot, args) {
         const target = String(args?.target || "").trim().toLowerCase();
         let targetJid = bot.senderJid;
@@ -438,7 +537,6 @@ export class ToolDispatcher {
         });
     }
 
-    /** Retorna menções da mensagem excluindo a própria Luma. */
     static async getActionTargetMentions(bot) {
         const mentioned = await bot.getMentionedJids();
         const me = bot.socket?.authState?.creds?.me;
@@ -451,10 +549,6 @@ export class ToolDispatcher {
         return mentioned.filter((jid) => !ownIds.has(clean(jid)));
     }
 
-    /**
-     * Agenda um lembrete a partir da linguagem natural. As pessoas a mencionar
-     * vêm das menções da mensagem; se ninguém foi marcado, lembra quem pediu.
-     */
     static async handleScheduleReminder(bot, args) {
         const text = args?.reminder_text || args?.text;
         const datetime = args?.datetime;
@@ -493,16 +587,16 @@ export class ToolDispatcher {
         const memStats = lumaHandler?.getStats?.() ?? { totalConversations: 0 };
 
         const text =
-            `📊 *Estat\u00edsticas Globais da Luma*\n\n` +
-            `🧠 *Intelig\u00eancia Artificial:*\n` +
-            `\u2022 Respostas Geradas: ${dbStats.ai_responses || 0}\n` +
-            `\u2022 Conversas Ativas (RAM): ${memStats.totalConversations}\n\n` +
-            `🎨 *M\u00eddia Gerada:*\n` +
-            `\u2022 Figurinhas: ${dbStats.stickers_created || 0}\n` +
-            `\u2022 Imagens: ${dbStats.images_created || 0}\n` +
-            `\u2022 GIFs: ${dbStats.gifs_created || 0}\n` +
-            `\u2022 V\u00eddeos Baixados: ${dbStats.videos_downloaded || 0}\n\n` +
-            `📈 *Total de Intera\u00e7\u00f5es:* ${dbStats.total_messages || 0}`;
+            `📊 *Estatísticas Globais da Luma*\n\n` +
+            `🧠 *Inteligência Artificial:*\n` +
+            `• Respostas Geradas: ${dbStats.ai_responses || 0}\n` +
+            `• Conversas Ativas (RAM): ${memStats.totalConversations}\n\n` +
+            `🎨 *Mídia Gerada:*\n` +
+            `• Figurinhas: ${dbStats.stickers_created || 0}\n` +
+            `• Imagens: ${dbStats.images_created || 0}\n` +
+            `• GIFs: ${dbStats.gifs_created || 0}\n` +
+            `• Vídeos Baixados: ${dbStats.videos_downloaded || 0}\n\n` +
+            `📈 *Total de Interações:* ${dbStats.total_messages || 0}`;
 
         await bot.sendText(text);
     }
