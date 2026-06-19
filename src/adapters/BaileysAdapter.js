@@ -286,21 +286,27 @@ export class BaileysAdapter extends MessagingPort {
   // --- Métodos de Envio ---
 
   async sendText(text, options = {}) {
-    // Registra o fingerprint antes de enviar para filtrar o eco do Baileys
-    trackSentMessage(this.remoteJid, text);
-
     const payload = { text };
     if (options.mentions?.length) payload.mentions = options.mentions;
+
+    let sent;
     if (options.quoted) {
       const quotedMsg =
         options.quoted instanceof BaileysAdapter
           ? options.quoted.raw
           : options.quoted;
-      return await this.sock.sendMessage(this.remoteJid, payload, {
+      sent = await this.sock.sendMessage(this.remoteJid, payload, {
         quoted: quotedMsg,
       });
+    } else {
+      sent = await this.sock.sendMessage(this.remoteJid, payload);
     }
-    return await this.sock.sendMessage(this.remoteJid, payload);
+
+    if (sent?.key?.id) {
+      trackSentMessage(sent.key.id);
+    }
+
+    return sent;
   }
 
   async reply(text, options = {}) {

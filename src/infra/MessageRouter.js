@@ -124,7 +124,7 @@ export async function routeMessages(sock, m) {
       if (!message.message) continue;
       const botAdapter = new BaileysAdapter(sock, message);
 
-      if (isBotSelf(sock, botAdapter) || isSentByBot(botAdapter.jid, botAdapter.body)) {
+      if (isBotSelf(sock, botAdapter) || isSentByBot(message.key?.id)) {
         continue;
       }
 
