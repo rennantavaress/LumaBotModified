@@ -272,6 +272,19 @@ const LUMA_CONFIG_DEFAULTS = {
           description: "Exibe a lista completa de comandos e funcionalidades do bot. Use quando o usuário perguntar o que você faz, quais comandos existem, como usar o bot, ou pedir ajuda geral.",
         },
         {
+          name: "show_summary",
+          description: "Resume as mensagens recentes deste chat. Use SOMENTE quando o usuário pedir explicitamente um resumo da conversa, do grupo, do chat ou do que rolou recentemente.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              limit: {
+                type: "NUMBER",
+                description: "Número de mensagens recentes a considerar. Omita quando o usuário não especificar. Máximo 200.",
+              },
+            },
+          },
+        },
+        {
           name: "show_rank",
           description: "Consulta o ranking de interações com a Luma. Use SOMENTE quando o usuário pedir explicitamente para ver o ranking, sua própria posição ou a posição de outra pessoa, como 'mostra o rank geral', 'como estou no rank?' ou 'qual o rank da Ana?'. Não use em comentários casuais, piadas, comparações, jogos ou perguntas hipotéticas sobre ranking.",
           parameters: {
@@ -370,6 +383,8 @@ Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar m
 - Se o usuário pedir explicitamente para pesquisar, buscar, googlar ou procurar algo na internet, use search_web OBRIGATORIAMENTE — sem exceções.
 - Para perguntas sobre notícias recentes, eventos atuais, preços, lançamentos, resultados de jogos, clima ou qualquer coisa que possa ter mudado após 2024, use search_web ANTES de responder.
 - Quando o usuário perguntar o que você faz, quais são seus comandos, como te usar, ou pedir ajuda geral, use show_help OBRIGATORIAMENTE.
+- Use show_summary OBRIGATORIAMENTE quando o usuário pedir explicitamente para resumir a conversa, o chat, o grupo ou o que rolou recentemente. Se citar um número, passe esse número como limit.
+- NUNCA use clear_history para pedidos de resumo. "resumo da conversa" significa show_summary, não apagar memória.
 - Use show_rank SOMENTE quando o usuário pedir explicitamente para ver/listar um ranking ou consultar a posição de alguém. Não acione por comentários casuais sobre "rank", competitividade, jogos ou status.
 - Use set_nickname SOMENTE quando o usuário pedir explicitamente para definir/trocar o apelido exibido no ranking. Não trate frases como "meu nome é X", perguntas ou piadas como pedido de alteração.
 - Quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro ou avisar alguém depois, use schedule_reminder com a data/hora ABSOLUTA em ISO 8601 (fuso -03:00), calculada a partir da "Data e hora atual" informada acima.
@@ -436,6 +451,8 @@ Você é capaz de executar algumas ações no WhatsApp (marcar todos, expulsar m
 - Se o usuário pedir explicitamente para pesquisar, buscar, googlar ou procurar algo na internet, use search_web OBRIGATORIAMENTE — sem exceções.
 - Para perguntas sobre notícias recentes, eventos atuais, preços, lançamentos ou qualquer coisa que possa ter mudado após 2024, use search_web ANTES de responder.
 - Quando o usuário perguntar o que você faz, quais são seus comandos, como te usar, ou pedir ajuda geral, use show_help OBRIGATORIAMENTE.
+- Use show_summary OBRIGATORIAMENTE quando o usuário pedir explicitamente para resumir a conversa, o chat, o grupo ou o que rolou recentemente. Se citar um número, passe esse número como limit.
+- NUNCA use clear_history para pedidos de resumo. "resumo da conversa" significa show_summary, não apagar memória.
 - Use show_rank SOMENTE quando o usuário pedir explicitamente para ver/listar um ranking ou consultar a posição de alguém. Não acione por comentários casuais sobre "rank", competitividade, jogos ou status.
 - Use set_nickname SOMENTE quando o usuário pedir explicitamente para definir/trocar o apelido exibido no ranking. Não trate frases como "meu nome é X", perguntas ou piadas como pedido de alteração.
 - Quando o usuário pedir para ser lembrado de algo, marcar um compromisso/evento futuro ou avisar alguém depois, use schedule_reminder com a data/hora ABSOLUTA em ISO 8601 (fuso -03:00), calculada a partir da "Data e hora atual" informada acima.

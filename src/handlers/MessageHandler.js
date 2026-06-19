@@ -37,6 +37,9 @@ function buildAudioTranscriber() {
 function buildPluginManager() {
   const lumaHandler = new LumaHandler();
   const audioTranscriber = buildAudioTranscriber();
+  const resumoPlugin = new ResumoPlugin({ lumaHandler });
+  lumaHandler.setToolContext({ resumoPlugin });
+
   return new PluginManager()
     .register(new MediaPlugin())
     .register(new DownloadPlugin())
@@ -45,7 +48,7 @@ function buildPluginManager() {
     .register(new LumaPlugin({ lumaHandler, audioTranscriber }))
     .register(new SpontaneousPlugin({ lumaHandler }))
     .register(new UtilsPlugin())
-    .register(new ResumoPlugin({ lumaHandler }))
+    .register(resumoPlugin)
     .register(new UserPlugin())
     .register(new RankPlugin())
     .register(new ReminderPlugin());

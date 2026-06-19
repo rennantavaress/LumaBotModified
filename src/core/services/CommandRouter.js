@@ -121,6 +121,10 @@ export class CommandRouter {
     }
 
     // Linguagem natural para limpar memória
+    if (this.isContextualSummaryRequest(text)) {
+      return COMMANDS.RESUMO;
+    }
+
     if (this.isContextualClearRequest(text)) {
       return COMMANDS.LUMA_CLEAR;
     }
@@ -142,6 +146,33 @@ export class CommandRouter {
   /**
    * Detecta pedidos de criação de figurinha.
    */
+  static isContextualSummaryRequest(text) {
+    if (!text) return false;
+
+    const normalized = text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/[!?.,:;]+/g, " ")
+      .replace(/\s+/g, " ");
+
+    const hasSummaryVerb =
+      /\b(resumo|resumir|resume|resuma|sintese|sintetiza|sintetizar)\b/.test(normalized);
+
+    if (!hasSummaryVerb) return false;
+
+    const asksConversationSummary =
+      /\b(conversa|chat|grupo|mensagens?|papo)\b/.test(normalized) ||
+      /\b(o que rolou|que rolou|ultimas?|ultimos?|recentes?)\b/.test(normalized);
+
+    const conciseSummaryRequest =
+      /^(?:luma\s+)?(?:(?:me\s+)?(?:faz|faca|fazer|manda|mande|mandar|mostra|mostre|mostrar|da|dai|quero|pode|poderia)\s+(?:um\s+)?)?(?:resumo|sintese)(?:\s+(?:pra mim|por favor|pfv))?$/.test(normalized);
+
+    return asksConversationSummary || conciseSummaryRequest;
+  }
+
+
   static isContextualStickerRequest(text) {
     if (!text) return false;
 

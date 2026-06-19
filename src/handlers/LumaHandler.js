@@ -25,6 +25,7 @@ export class LumaHandler {
     this.aiService       = aiService     ?? createAIProvider(env);
     this.visionService   = visionService ?? this._createVisionService();
     this.lastBotMessages = new Map();
+    this.toolContext     = {};
   }
 
   get isConfigured() {
@@ -232,6 +233,10 @@ export class LumaHandler {
     if (messageId) this.lastBotMessages.set(jid, messageId);
   }
 
+  setToolContext(toolContext = {}) {
+    this.toolContext = toolContext;
+  }
+
   extractUserMessage(text) {
     if (!text) return '';
     return text
@@ -284,7 +289,7 @@ export class LumaHandler {
       if (lastSent?.key?.id) this.saveLastBotMessage(bot.jid, lastSent.key.id);
     }
     if (hasTools) {
-      await ToolDispatcher.handleToolCalls(bot, response.toolCalls, this, quotedBot);
+      await ToolDispatcher.handleToolCalls(bot, response.toolCalls, this, quotedBot, this.toolContext);
     }
   }
 

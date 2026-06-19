@@ -73,4 +73,22 @@ describe('CommandRouter.detect — comandos', () => {
   ])('nao confunde conversa sobre sticker com comando: "%s"', (input) => {
     expect(CommandRouter.detect(input, { hasStickerSource: true })).toBeNull();
   });
+
+  it.each([
+    'luma faça um resumo da conversa',
+    'faça um resumo da conversa',
+    'resume o que rolou',
+    'me manda um resumo das ultimas 30 mensagens',
+    'resumo',
+  ])('detecta pedido contextual de resumo: "%s"', (input) => {
+    expect(CommandRouter.detect(input)).toBe('!resumo');
+  });
+
+  it.each([
+    'o resumo do rank é confuso',
+    'esse resumo ficou bom',
+    'como fazer um resumo melhor?',
+  ])('nao confunde conversa sobre resumo com comando: "%s"', (input) => {
+    expect(CommandRouter.detect(input)).toBeNull();
+  });
 });
